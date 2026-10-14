@@ -20,7 +20,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("resume-parser-service")
 
-CLAUDE_MODEL = "claude-3-5-sonnet-20241022"
+DEFAULT_CLAUDE_MODEL = "claude-sonnet-5-5"
 PARSE_RESUME_TOOL = "parse_resume"
 MAX_PDF_BYTES = 10 * 1024 * 1024
 
@@ -163,6 +163,11 @@ def get_anthropic_api_key() -> str | None:
     return key or None
 
 
+def get_claude_model() -> str:
+    model = os.getenv("CLAUDE_MODEL", "").strip()
+    return model or DEFAULT_CLAUDE_MODEL
+
+
 def extract_text_from_pdf(pdf_bytes: bytes) -> str:
     try:
         document = fitz.open(stream=pdf_bytes, filetype="pdf")
@@ -194,12 +199,13 @@ def mock_parse_resume() -> ResumeParsedData:
 
 
 def parse_resume_with_claude(raw_text: str, api_key: str) -> ResumeParsedData:
+    model = get_claude_model()
     client = Anthropic(api_key=api_key)
-    logger.info("Calling Claude model %s to parse resume", CLAUDE_MODEL)
+    logger.info("Calling Claude model %s to parse resume", model)
 
     try:
         response = client.messages.create(
-            model=CLAUDE_MODEL,
+            model=model,
             max_tokens=4096,
             tools=[PARSE_RESUME_TOOL_SCHEMA],
             tool_choice={"type": "tool", "name": PARSE_RESUME_TOOL},
