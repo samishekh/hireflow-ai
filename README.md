@@ -34,7 +34,10 @@ Put the key in `resume-parser-service/.env` if you want a real parse. That file 
 
 ```bash
 ANTHROPIC_API_KEY=your-key-here
+CLAUDE_MODEL=claude-sonnet-5-5
 ```
+
+`CLAUDE_MODEL` is optional. When it is unset, the parser uses `claude-sonnet-5-5`.
 
 ```bash
 curl -s http://localhost:8000/health
