@@ -49,6 +49,11 @@ class ResumeParsedData(BaseModel):
     education: list[Education] = Field(..., description="Education history entries")
 
 
+class ParseResumeResponse(BaseModel):
+    raw_text: str = Field(..., description="Text extracted from the PDF before parsing")
+    parsed_data: ResumeParsedData = Field(..., description="Structured fields extracted from the resume")
+
+
 PARSE_RESUME_TOOL_SCHEMA: dict[str, Any] = {
     "name": PARSE_RESUME_TOOL,
     "description": (
@@ -259,8 +264,8 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/parse-resume", response_model=ResumeParsedData)
-async def parse_resume(file: UploadFile = File(...)) -> ResumeParsedData:
+@app.post("/parse-resume", response_model=ParseResumeResponse)
+async def parse_resume(file: UploadFile = File(...)) -> ParseResumeResponse:
     if not is_pdf_upload(file):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
@@ -288,9 +293,11 @@ async def parse_resume(file: UploadFile = File(...)) -> ResumeParsedData:
 
     api_key = get_anthropic_api_key()
     if api_key is None:
-        return mock_parse_resume()
+        parsed_data = mock_parse_resume()
+    else:
+        parsed_data = parse_resume_with_claude(raw_text, api_key)
 
-    return parse_resume_with_claude(raw_text, api_key)
+    return ParseResumeResponse(raw_text=raw_text, parsed_data=parsed_data)
 
 
 if __name__ == "__main__":
