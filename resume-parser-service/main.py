@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import logging
 import os
+from copy import deepcopy
 from typing import Any
 
 import pymupdf as fitz
 from anthropic import Anthropic, APIError, APIStatusError
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 load_dotenv()
 
@@ -26,6 +27,8 @@ MAX_PDF_BYTES = 10 * 1024 * 1024
 
 
 class WorkExperience(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     company: str = Field(..., description="Employer or organization name")
     role: str = Field(..., description="Job title or role")
     duration: str = Field(..., description="Employment period, e.g. 'Jan 2020 - Present'")
@@ -33,6 +36,8 @@ class WorkExperience(BaseModel):
 
 
 class Education(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     institution: str = Field(..., description="School, university, or training organization")
     degree: str = Field(..., description="Degree or credential, e.g. 'B.S.' or 'Bootcamp Certificate'")
     field_of_study: str = Field(..., description="Major or field of study, or empty string if not found")
@@ -40,6 +45,8 @@ class Education(BaseModel):
 
 
 class ResumeParsedData(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     candidate_name: str = Field(..., description="Full name of the candidate")
     email: str = Field(..., description="Email address, or empty string if not found")
     phone: str = Field(..., description="Phone number, or empty string if not found")
@@ -50,8 +57,57 @@ class ResumeParsedData(BaseModel):
 
 
 class ParseResumeResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     raw_text: str = Field(..., description="Text extracted from the PDF before parsing")
     parsed_data: ResumeParsedData = Field(..., description="Structured fields extracted from the resume")
+
+
+_SCHEMA_KEY_ORDER = (
+    "description",
+    "type",
+    "properties",
+    "items",
+    "required",
+    "additionalProperties",
+)
+
+
+def json_schema_for(model: type[BaseModel]) -> dict[str, Any]:
+    """JSON Schema for a model, with nested models inlined and Pydantic titles removed."""
+    schema = model.model_json_schema()
+    definitions = schema.pop("$defs", {})
+
+    def resolve(node: Any) -> Any:
+        if isinstance(node, dict):
+            if "$ref" in node:
+                ref_name = node["$ref"].rsplit("/", 1)[-1]
+                extras = {key: resolve(value) for key, value in node.items() if key != "$ref"}
+                resolved = resolve(deepcopy(definitions[ref_name]))
+                resolved.update(extras)
+                return _order_schema(resolved)
+            cleaned: dict[str, Any] = {}
+            for key, value in node.items():
+                if key == "title":
+                    continue
+                if key == "properties" and isinstance(value, dict):
+                    cleaned[key] = {name: resolve(child) for name, child in value.items()}
+                else:
+                    cleaned[key] = resolve(value)
+            return _order_schema(cleaned)
+        if isinstance(node, list):
+            return [resolve(item) for item in node]
+        return node
+
+    return resolve(schema)
+
+
+def _order_schema(node: dict[str, Any]) -> dict[str, Any]:
+    ordered = {key: node[key] for key in _SCHEMA_KEY_ORDER if key in node}
+    for key, value in node.items():
+        if key not in ordered:
+            ordered[key] = value
+    return ordered
 
 
 PARSE_RESUME_TOOL_SCHEMA: dict[str, Any] = {
@@ -62,63 +118,7 @@ PARSE_RESUME_TOOL_SCHEMA: dict[str, Any] = {
         "for missing contact or education subfields and an empty list when "
         "skills, work history, or education cannot be determined."
     ),
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "candidate_name": {"type": "string", "description": "Full name of the candidate"},
-            "email": {"type": "string", "description": "Email address, or empty string if not found"},
-            "phone": {"type": "string", "description": "Phone number, or empty string if not found"},
-            "skills": {
-                "type": "array",
-                "items": {"type": "string"},
-                "description": "List of skills",
-            },
-            "years_of_experience": {
-                "type": "number",
-                "description": "Total years of professional experience",
-            },
-            "work_history": {
-                "type": "array",
-                "description": "Chronological work experience entries",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "company": {"type": "string"},
-                        "role": {"type": "string"},
-                        "duration": {"type": "string"},
-                        "description": {"type": "string"},
-                    },
-                    "required": ["company", "role", "duration", "description"],
-                    "additionalProperties": False,
-                },
-            },
-            "education": {
-                "type": "array",
-                "description": "Education history entries",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "institution": {"type": "string"},
-                        "degree": {"type": "string"},
-                        "field_of_study": {"type": "string"},
-                        "duration": {"type": "string"},
-                    },
-                    "required": ["institution", "degree", "field_of_study", "duration"],
-                    "additionalProperties": False,
-                },
-            },
-        },
-        "required": [
-            "candidate_name",
-            "email",
-            "phone",
-            "skills",
-            "years_of_experience",
-            "work_history",
-            "education",
-        ],
-        "additionalProperties": False,
-    },
+    "input_schema": json_schema_for(ResumeParsedData),
 }
 
 MOCK_PARSED_RESUME = ResumeParsedData(
