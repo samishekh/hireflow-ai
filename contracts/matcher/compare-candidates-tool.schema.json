@@ -1,0 +1,39 @@
+{
+  "type": "object",
+  "properties": {
+    "rankings": {
+      "description": "Relative order of the candidates sent",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "candidate_id": {
+            "description": "Id of a candidate from the request",
+            "type": "string",
+            "minLength": 1
+          },
+          "rank": {
+            "description": "1 is the best relative fit",
+            "type": "integer",
+            "minimum": 1
+          },
+          "reason": {
+            "description": "One-line reason for this rank",
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "candidate_id",
+          "rank",
+          "reason"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "rankings"
+  ],
+  "additionalProperties": false
+}

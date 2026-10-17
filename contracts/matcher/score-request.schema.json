@@ -1,0 +1,109 @@
+{
+  "type": "object",
+  "properties": {
+    "candidate_id": {
+      "description": "Caller-supplied id echoed on the score result",
+      "type": "string",
+      "minLength": 1
+    },
+    "job_description": {
+      "description": "Job the candidate is scored against",
+      "type": "string",
+      "minLength": 1
+    },
+    "candidate": {
+      "description": "Blind candidate profile",
+      "type": "object",
+      "properties": {
+        "skills": {
+          "description": "Skills used for scoring. Name and contact are not included.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "years_of_experience": {
+          "description": "Total years of professional experience",
+          "type": "number"
+        },
+        "work_history": {
+          "description": "Work history without identity fields",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "company": {
+                "description": "Employer or organization name",
+                "type": "string"
+              },
+              "role": {
+                "description": "Job title or role",
+                "type": "string"
+              },
+              "duration": {
+                "description": "Employment period, e.g. 'Jan 2020 - Present'",
+                "type": "string"
+              },
+              "description": {
+                "description": "Summary of responsibilities and achievements",
+                "type": "string"
+              }
+            },
+            "required": [
+              "company",
+              "role",
+              "duration",
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "education": {
+          "description": "Education history without identity fields",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "institution": {
+                "description": "School, university, or training organization",
+                "type": "string"
+              },
+              "degree": {
+                "description": "Degree or credential, e.g. 'B.S.' or 'Bootcamp Certificate'",
+                "type": "string"
+              },
+              "field_of_study": {
+                "description": "Major or field of study, or empty string if not found",
+                "type": "string"
+              },
+              "duration": {
+                "description": "Study period, e.g. '2016 - 2020'",
+                "type": "string"
+              }
+            },
+            "required": [
+              "institution",
+              "degree",
+              "field_of_study",
+              "duration"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "skills",
+        "years_of_experience",
+        "work_history",
+        "education"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "candidate_id",
+    "job_description",
+    "candidate"
+  ],
+  "additionalProperties": false
+}

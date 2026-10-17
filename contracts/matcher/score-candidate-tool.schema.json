@@ -1,0 +1,66 @@
+{
+  "type": "object",
+  "properties": {
+    "skills_score": {
+      "description": "Skills match from 0 to 100",
+      "type": "number",
+      "maximum": 100,
+      "minimum": 0
+    },
+    "experience_score": {
+      "description": "Experience match from 0 to 100",
+      "type": "number",
+      "maximum": 100,
+      "minimum": 0
+    },
+    "education_score": {
+      "description": "Education match from 0 to 100",
+      "type": "number",
+      "maximum": 100,
+      "minimum": 0
+    },
+    "matched_skills": {
+      "description": "Skills from the candidate that match the job",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "missing_skills": {
+      "description": "Job skills the candidate does not show",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "strengths": {
+      "description": "Short evidence statements for the score",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "concerns": {
+      "description": "Short evidence statements against the score",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "summary": {
+      "description": "One-paragraph scoring summary",
+      "type": "string"
+    }
+  },
+  "required": [
+    "skills_score",
+    "experience_score",
+    "education_score",
+    "matched_skills",
+    "missing_skills",
+    "strengths",
+    "concerns",
+    "summary"
+  ],
+  "additionalProperties": false
+}
