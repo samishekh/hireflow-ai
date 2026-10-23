@@ -259,10 +259,15 @@ def parse_resume_with_claude(raw_text: str, api_key: str) -> ResumeParsedData:
     return parsed
 
 
-def is_pdf_upload(file: UploadFile) -> bool:
-    filename = (file.filename or "").lower()
-    content_type = (file.content_type or "").lower()
-    return filename.endswith(".pdf") or content_type in {"application/pdf", "application/x-pdf"}
+PDF_HEADER = b"%PDF-"
+
+
+def is_pdf_filename(filename: str | None) -> bool:
+    return bool(filename) and filename.lower().endswith(".pdf")
+
+
+def has_pdf_header(pdf_bytes: bytes) -> bool:
+    return pdf_bytes.startswith(PDF_HEADER)
 
 
 @app.get("/health")
@@ -272,7 +277,7 @@ def health() -> dict[str, str]:
 
 @app.post("/parse-resume", response_model=ParseResumeResponse)
 async def parse_resume(file: UploadFile = File(...)) -> ParseResumeResponse:
-    if not is_pdf_upload(file):
+    if not is_pdf_filename(file.filename):
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
     try:
@@ -287,6 +292,8 @@ async def parse_resume(file: UploadFile = File(...)) -> ParseResumeResponse:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
     if len(pdf_bytes) > MAX_PDF_BYTES:
         raise HTTPException(status_code=413, detail="PDF exceeds the 10MB size limit.")
+    if not has_pdf_header(pdf_bytes):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
     logger.info(
         "Received resume upload filename=%s size=%s bytes",

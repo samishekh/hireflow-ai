@@ -6,13 +6,13 @@ The clickable demo is a small web UI. The services behind it are a Java API plus
 
 ## Status
 
-The resume parser and job matcher are built. The core API, web UI, and deployment are still to come.
+The resume parser, job matcher, and core API are built. The web UI and deployment are still to come.
 
 | Piece | Role | Status |
 | --- | --- | --- |
 | `resume-parser-service` | Python FastAPI. Turns a PDF into structured candidate data. | Built |
 | `job-matcher-service` | Python FastAPI. Scores a parsed CV against a job, then compares the top candidates. | Built |
-| `core-api` | Java Spring Boot. Jobs, uploads, orchestration, PostgreSQL. | Not started |
+| `core-api` | Java Spring Boot. Jobs, uploads, orchestration, PostgreSQL. | Built |
 | `web-ui` | React + Vite. Create a job, upload CVs, watch status, read rankings, record an override. | Not started |
 
 ## Resume parser
@@ -79,3 +79,55 @@ curl -s http://localhost:8001/compare \
 ```
 
 `POST /compare` accepts 2 to 5 candidates. Rank 1 is the best fit.
+
+## Core API
+
+`core-api` stores jobs and candidates in PostgreSQL and runs each upload through parse, score, and compare. It calls the parser on port 8000 and the matcher on port 8001. Name, email, and phone stay in the database. The matcher receives the normalized job description and the blind profile only. `overall_score` and `formula_version` are stored as the matcher returns them.
+
+Java 21 is required. Start Postgres, then the two Python services, then the API:
+
+```bash
+docker start hireflow-postgres || docker run --name hireflow-postgres \
+  -e POSTGRES_PASSWORD=hireflow \
+  -e POSTGRES_DB=hireflow \
+  -p 5432:5432 -d postgres:16
+```
+
+```bash
+cd resume-parser-service
+source venv/bin/activate
+python main.py
+```
+
+```bash
+cd job-matcher-service
+source venv/bin/activate
+python main.py
+```
+
+```bash
+cd core-api
+./mvnw spring-boot:run
+```
+
+The API listens on port 8080. Interactive docs are at [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html). Health is at [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health).
+
+With both Python services in mock mode (no `ANTHROPIC_API_KEY`), a two-PDF upload finishes with `overall_score` 67.0 on each candidate. The second identical blind profile reuses the stored score. Rank 1 is the best fit.
+
+```bash
+curl -s http://localhost:8080/api/jobs \
+  -H 'content-type: application/json' \
+  -d '{"title":"Backend engineer","description":"Python APIs"}'
+
+curl -s -X POST http://localhost:8080/api/jobs/{jobId}/candidates \
+  -F "files=@/path/to/one.pdf" \
+  -F "files=@/path/to/two.pdf"
+
+curl -s http://localhost:8080/api/jobs/{jobId}/rankings
+
+curl -s -X POST http://localhost:8080/api/candidates/{candidateId}/override \
+  -H 'content-type: application/json' \
+  -d '{"decision":"accepted","note":"Matches the role","decided_by":"recruiter"}'
+```
+
+`POST /api/jobs/{id}/candidates` returns 202. Poll rankings until status is `done` or `failed`. An override is accepted only after `done`, and it does not change the model score.

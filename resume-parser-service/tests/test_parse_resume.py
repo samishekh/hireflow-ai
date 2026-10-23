@@ -144,6 +144,26 @@ def test_api_error_returns_502(client: TestClient, monkeypatch: pytest.MonkeyPat
     assert response.json()["detail"] == "Failed to reach resume parsing provider."
 
 
+def test_non_pdf_extension_is_rejected(client: TestClient):
+    response = client.post(
+        "/parse-resume",
+        files={"file": ("resume.txt", b"%PDF-1.4 not a real document", "application/pdf")},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Only PDF files are supported."
+
+
+def test_pdf_extension_without_header_is_rejected(client: TestClient):
+    response = client.post(
+        "/parse-resume",
+        files={"file": ("resume.pdf", b"not a pdf", "application/pdf")},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Only PDF files are supported."
+
+
 def test_missing_api_key_returns_mock_and_does_not_call_claude(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ):

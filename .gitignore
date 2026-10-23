@@ -3,5 +3,7 @@ venv/
 target/
 node_modules/
 .idea/
+.vscode/
+smoke-test/
 __pycache__/
 *.pyc

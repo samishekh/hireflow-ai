@@ -1,0 +1,33 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: core-api
+  datasource:
+    url: jdbc:postgresql://localhost:5432/hireflow
+    username: postgres
+    password: hireflow
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 100MB
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+
+hireflow:
+  parser-base-url: http://localhost:8000
+  matcher-base-url: http://localhost:8001
+  retry:
+    max-attempts: 3
+    initial-delay: 500ms
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

@@ -296,7 +296,6 @@ def call_tool(api_key: str, tool_name: str, tool_schema: dict[str, Any], user_co
         response = client.messages.create(
             model=model,
             max_tokens=4096,
-            temperature=0,
             tools=[tool_schema],
             tool_choice={"type": "tool", "name": tool_name},
             messages=[{"role": "user", "content": user_content}],
