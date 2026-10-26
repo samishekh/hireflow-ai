@@ -1,118 +1,66 @@
 # HireFlow AI
 
-A recruiter creates a job, uploads a pool of CV PDFs, and gets a ranked shortlist with reasons. HireFlow parses each CV, scores it against the job with a fixed rubric, and stores the result.
+A recruiter creates a job, uploads CV PDFs, and gets a ranked shortlist with reasons. Each CV is parsed, scored against the job with a fixed rubric, and stored.
 
-The clickable demo is a small web UI. The services behind it are a Java API plus two Python services.
-
-## Status
-
-The resume parser, job matcher, and core API are built. The web UI and deployment are still to come.
+## Services
 
 | Piece | Role | Status |
 | --- | --- | --- |
-| `resume-parser-service` | Python FastAPI. Turns a PDF into structured candidate data. | Built |
-| `job-matcher-service` | Python FastAPI. Scores a parsed CV against a job, then compares the top candidates. | Built |
-| `core-api` | Java Spring Boot. Jobs, uploads, orchestration, PostgreSQL. | Built |
+| `resume-parser-service` | Python FastAPI. PDF to structured candidate data. Port 8000. | Built |
+| `job-matcher-service` | Python FastAPI. Scores a parsed CV, then compares the top candidates. Port 8001. | Built |
+| `core-api` | Java Spring Boot. Jobs, uploads, orchestration, PostgreSQL. Port 8080. | Built |
 | `web-ui` | React + Vite. Create a job, upload CVs, watch status, read rankings, record an override. | Not started |
 
-## Resume parser
+## Run
 
-The parser reads a PDF, extracts the text, and asks Claude to return structured fields: name, contact, skills, years of experience, work history, and education. If `ANTHROPIC_API_KEY` is missing, it returns a fixed mock resume so the service still runs.
-
-From `resume-parser-service`:
+From the repo root:
 
 ```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python main.py
+docker compose up --build
 ```
 
-The API listens on port 8000. Interactive docs are at [http://localhost:8000/docs](http://localhost:8000/docs).
+Compose starts Postgres, the parser, the matcher, and `core-api`. Stop with `docker compose down`.
 
-Put the key in `resume-parser-service/.env` if you want a real parse. That file is gitignored.
+| | |
+| --- | --- |
+| Parser | [http://localhost:8000/docs](http://localhost:8000/docs) |
+| Matcher | [http://localhost:8001/docs](http://localhost:8001/docs) |
+| Core API | [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) |
+| Health | [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health) |
 
-```bash
+### Claude or mock
+
+Both Python services call Claude when `ANTHROPIC_API_KEY` is set. With no key they stay in mock mode: the parser returns a fixed resume, `/score` returns sub-scores 80, 60, and 40 (`overall_score` 67.0), and `/compare` keeps the input order.
+
+Put the same file in `resume-parser-service/.env` and `job-matcher-service/.env`. Both are gitignored, and Compose treats a missing file as mock mode. `.dockerignore` keeps `.env` out of images. Recreate the containers after you change either file.
+
+```
 ANTHROPIC_API_KEY=your-key-here
 CLAUDE_MODEL=claude-sonnet-5-5
 ```
 
-`CLAUDE_MODEL` is optional. When it is unset, the parser uses `claude-sonnet-5-5`.
+`CLAUDE_MODEL` is optional and defaults to `claude-sonnet-5-5`. Leave the key empty to stay in mock mode.
+
+### Smoke test
+
+With the stack up and both services in mock mode:
 
 ```bash
-curl -s http://localhost:8000/health
-
-curl -s -F "file=@/path/to/resume.pdf" http://localhost:8000/parse-resume
+./scripts/smoke-test.sh
 ```
 
-Only PDF uploads are accepted, and the file must be under 10MB.
+The script creates a job, uploads `scripts/fixtures/one.pdf` and `scripts/fixtures/two.pdf`, and expects both candidates to finish at `overall_score` 67.0 with model `mock`. It then records an accepted override and checks that the decision is stored while the score and ranks stay the same. A real API key fails those fixed scores.
 
-## Job matcher
+## Pipeline
 
-The matcher scores one parsed candidate against a job, then ranks up to five already-scored candidates against each other. The score request is blind: skills, work history, education, and years of experience only. Claude returns skills, experience, and education sub-scores plus evidence. The service computes `overall_score` as `0.50 * skills + 0.35 * experience + 0.15 * education`, rounded to one decimal, and labels that formula `v1`.
+`core-api` runs each upload through parse, score, and compare. Name, email, and phone stay in PostgreSQL. The matcher receives the normalized job description and a blind profile only. `overall_score` and `formula_version` are stored as the matcher returns them. A second identical blind profile reuses the stored score.
 
-If `ANTHROPIC_API_KEY` is missing, `/score` returns fixed sub-scores of 80, 60, and 40 (`overall_score` 67.0) and `/compare` keeps the input order.
+1. **Parse.** Extract PDF text and return name, contact, skills, years of experience, work history, and education. PDF only, under 10MB. `POST /parse-resume`.
+2. **Score.** Blind profile: skills, work history, education, and years of experience. Claude returns skills, experience, and education sub-scores plus evidence. `overall_score` is `0.50 * skills + 0.35 * experience + 0.15 * education`, rounded to one decimal. Formula label: `v1`. `POST /score`.
+3. **Compare.** Rank 2 to 5 already-scored candidates. Rank 1 is the best fit. `POST /compare`.
+4. **Override.** Accepted only after status `done`. It does not change the model score.
 
-From `job-matcher-service`:
-
-```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python main.py
-```
-
-The API listens on port 8001. Interactive docs are at [http://localhost:8001/docs](http://localhost:8001/docs).
-
-Put the key in `job-matcher-service/.env` if you want a real score. That file is gitignored. `CLAUDE_MODEL` is optional and defaults to `claude-sonnet-5-5`.
-
-```bash
-curl -s http://localhost:8001/health
-
-curl -s http://localhost:8001/score \
-  -H 'content-type: application/json' \
-  -d '{"candidate_id":"cand-1","job_description":"Backend engineer","candidate":{"skills":["Python"],"years_of_experience":5,"work_history":[],"education":[]}}'
-
-curl -s http://localhost:8001/compare \
-  -H 'content-type: application/json' \
-  -d '{"job_description":"Backend engineer","candidates":[{"candidate_id":"cand-1","skills":["Python"],"years_of_experience":5,"work_history":[],"education":[],"skills_score":80,"experience_score":60,"education_score":40,"summary":"API work"},{"candidate_id":"cand-2","skills":["Go"],"years_of_experience":3,"work_history":[],"education":[],"skills_score":70,"experience_score":55,"education_score":40,"summary":"Services work"}]}'
-```
-
-`POST /compare` accepts 2 to 5 candidates. Rank 1 is the best fit.
-
-## Core API
-
-`core-api` stores jobs and candidates in PostgreSQL and runs each upload through parse, score, and compare. It calls the parser on port 8000 and the matcher on port 8001. Name, email, and phone stay in the database. The matcher receives the normalized job description and the blind profile only. `overall_score` and `formula_version` are stored as the matcher returns them.
-
-Java 21 is required. Start Postgres, then the two Python services, then the API:
-
-```bash
-docker start hireflow-postgres || docker run --name hireflow-postgres \
-  -e POSTGRES_PASSWORD=hireflow \
-  -e POSTGRES_DB=hireflow \
-  -p 5432:5432 -d postgres:16
-```
-
-```bash
-cd resume-parser-service
-source venv/bin/activate
-python main.py
-```
-
-```bash
-cd job-matcher-service
-source venv/bin/activate
-python main.py
-```
-
-```bash
-cd core-api
-./mvnw spring-boot:run
-```
-
-The API listens on port 8080. Interactive docs are at [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html). Health is at [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health).
-
-With both Python services in mock mode (no `ANTHROPIC_API_KEY`), a two-PDF upload finishes with `overall_score` 67.0 on each candidate. The second identical blind profile reuses the stored score. Rank 1 is the best fit.
+`POST /api/jobs/{id}/candidates` returns 202. Poll rankings until status is `done` or `failed`.
 
 ```bash
 curl -s http://localhost:8080/api/jobs \
@@ -130,4 +78,29 @@ curl -s -X POST http://localhost:8080/api/candidates/{candidateId}/override \
   -d '{"decision":"accepted","note":"Matches the role","decided_by":"recruiter"}'
 ```
 
-`POST /api/jobs/{id}/candidates` returns 202. Poll rankings until status is `done` or `failed`. An override is accepted only after `done`, and it does not change the model score.
+Request bodies for `/parse-resume`, `/score`, and `/compare` are in the service docs linked above.
+
+## Run without Compose
+
+Java 21. Start Postgres, then each Python service, then the API. The API expects the parser on port 8000, the matcher on port 8001, and Postgres on port 5432 (`hireflow` / `hireflow`).
+
+```bash
+docker start hireflow-postgres || docker run --name hireflow-postgres \
+  -e POSTGRES_PASSWORD=hireflow \
+  -e POSTGRES_DB=hireflow \
+  -p 5432:5432 -d postgres:16
+```
+
+In `resume-parser-service`, then again in `job-matcher-service`:
+
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+```bash
+cd core-api
+./mvnw spring-boot:run
+```
