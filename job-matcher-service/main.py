@@ -27,6 +27,7 @@ SCORE_TOOL = "score_candidate"
 COMPARE_TOOL = "compare_candidates"
 FORMULA_VERSION = "v1"
 MOCK_MODEL = "mock"
+RECORDED_MODEL = "recorded"
 SKILLS_WEIGHT = Decimal("0.50")
 EXPERIENCE_WEIGHT = Decimal("0.35")
 EDUCATION_WEIGHT = Decimal("0.15")
@@ -276,6 +277,11 @@ def get_claude_model() -> str:
     return model or DEFAULT_CLAUDE_MODEL
 
 
+def get_recorded_scores_path() -> str | None:
+    path = os.getenv("HIREFLOW_RECORDED_SCORES", "").strip()
+    return path or None
+
+
 def _provider_error(exc: Exception) -> HTTPException:
     if isinstance(exc, APIStatusError):
         logger.exception("Anthropic API returned an error status: %s", exc.status_code)
@@ -296,6 +302,7 @@ def call_tool(api_key: str, tool_name: str, tool_schema: dict[str, Any], user_co
         response = client.messages.create(
             model=model,
             max_tokens=4096,
+            temperature=0,
             tools=[tool_schema],
             tool_choice={"type": "tool", "name": tool_name},
             messages=[{"role": "user", "content": user_content}],
@@ -337,6 +344,36 @@ def _score_from_assessment(candidate_id: str, assessment: ScoreAssessment, model
         formula_version=FORMULA_VERSION,
         model=model,
     )
+
+
+def score_from_recording(request: ScoreRequest, path: str) -> ScoreResponse:
+    """Score from a checked-in file. Used by the evaluation set so CI never calls Claude."""
+    logger.info("Scoring candidate_id=%s from recorded scores at %s", request.candidate_id, path)
+    try:
+        with open(path, encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.exception("Could not read recorded scores at %s", path)
+        raise HTTPException(status_code=500, detail="Recorded scores file could not be read.") from exc
+
+    rows = payload.get("candidates") if isinstance(payload, dict) else None
+    if not isinstance(rows, list):
+        raise HTTPException(status_code=500, detail="Recorded scores file is missing candidates.")
+
+    match = next((row for row in rows if isinstance(row, dict) and row.get("candidate_id") == request.candidate_id), None)
+    if match is None:
+        raise HTTPException(status_code=404, detail="No recorded score for this candidate.")
+
+    try:
+        assessment = ScoreAssessment.model_validate(match.get("assessment"))
+    except ValidationError as exc:
+        logger.error("Recorded score failed validation for candidate_id=%s: %s", request.candidate_id, exc)
+        raise HTTPException(
+            status_code=500,
+            detail="Recorded score did not match the score schema.",
+        ) from exc
+
+    return _score_from_assessment(request.candidate_id, assessment, RECORDED_MODEL)
 
 
 def mock_score(candidate_id: str) -> ScoreResponse:
@@ -438,6 +475,9 @@ def health() -> dict[str, str]:
 
 @app.post("/score", response_model=ScoreResponse)
 def score(request: ScoreRequest) -> ScoreResponse:
+    recorded = get_recorded_scores_path()
+    if recorded:
+        return score_from_recording(request, recorded)
     api_key = get_anthropic_api_key()
     if api_key is None:
         return mock_score(request.candidate_id)

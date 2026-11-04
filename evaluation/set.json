@@ -1,0 +1,335 @@
+{
+  "job_description": "Senior Backend Engineer. Build and run Java services for invoicing, credits, and ledger close. The work is PostgreSQL, REST, and production support for a billing system. Evidence of shipping APIs that finance teams rely on matters more than a long skill list.",
+  "candidates": [
+    {
+      "candidate_id": "ava-chen",
+      "profile": {
+        "skills": ["Java", "PostgreSQL", "REST"],
+        "years_of_experience": 9,
+        "work_history": [
+          {
+            "company": "Northline",
+            "role": "Senior Backend Engineer",
+            "duration": "2019 - Present",
+            "description": "Owns invoice and ledger APIs used by the finance team at month close."
+          }
+        ],
+        "education": [
+          {
+            "institution": "University of Michigan",
+            "degree": "B.S.",
+            "field_of_study": "Computer Science",
+            "duration": "2011 - 2015"
+          }
+        ]
+      },
+      "assessment": {
+        "skills_score": 95,
+        "experience_score": 90,
+        "education_score": 80,
+        "matched_skills": ["Java", "PostgreSQL", "REST"],
+        "missing_skills": [],
+        "strengths": ["Ships billing APIs that a finance team uses at month close"],
+        "concerns": [],
+        "summary": "Closest match on the stack and on production billing work."
+      }
+    },
+    {
+      "candidate_id": "noah-ibrahim",
+      "profile": {
+        "skills": ["Java", "PostgreSQL", "Spring Boot"],
+        "years_of_experience": 8,
+        "work_history": [
+          {
+            "company": "Ledgerly",
+            "role": "Backend Engineer",
+            "duration": "2018 - Present",
+            "description": "Built credit and refund services and the jobs that post them to the ledger."
+          }
+        ],
+        "education": [
+          {
+            "institution": "University of Texas",
+            "degree": "B.S.",
+            "field_of_study": "Computer Science",
+            "duration": "2010 - 2014"
+          }
+        ]
+      },
+      "assessment": {
+        "skills_score": 90,
+        "experience_score": 85,
+        "education_score": 80,
+        "matched_skills": ["Java", "PostgreSQL"],
+        "missing_skills": [],
+        "strengths": ["Credit and refund flows on a billing ledger"],
+        "concerns": ["Less evidence of owning an on-call rotation"],
+        "summary": "Strong billing backend, just behind the top profile on depth."
+      }
+    },
+    {
+      "candidate_id": "lena-okoye",
+      "profile": {
+        "skills": ["Java", "REST", "PostgreSQL"],
+        "years_of_experience": 7,
+        "work_history": [
+          {
+            "company": "Harbor Pay",
+            "role": "Software Engineer",
+            "duration": "2019 - Present",
+            "description": "Maintained payment APIs and the reconciliation jobs that follow a failed charge."
+          }
+        ],
+        "education": [
+          {
+            "institution": "Georgia Tech",
+            "degree": "B.S.",
+            "field_of_study": "Computer Engineering",
+            "duration": "2012 - 2016"
+          }
+        ]
+      },
+      "assessment": {
+        "skills_score": 88,
+        "experience_score": 80,
+        "education_score": 70,
+        "matched_skills": ["Java", "REST", "PostgreSQL"],
+        "missing_skills": [],
+        "strengths": ["Payment APIs and reconciliation after failed charges"],
+        "concerns": ["Billing domain is adjacent rather than the core product"],
+        "summary": "Solid backend fit with slightly less direct ledger experience."
+      }
+    },
+    {
+      "candidate_id": "samir-dalal",
+      "profile": {
+        "skills": ["Python", "PostgreSQL", "SQL"],
+        "years_of_experience": 12,
+        "work_history": [
+          {
+            "company": "Fieldnote",
+            "role": "Staff Engineer",
+            "duration": "2016 - Present",
+            "description": "Led reporting pipelines and the database work behind a finance close."
+          }
+        ],
+        "education": [
+          {
+            "institution": "University of Illinois",
+            "degree": "M.S.",
+            "field_of_study": "Computer Science",
+            "duration": "2012 - 2014"
+          }
+        ]
+      },
+      "assessment": {
+        "skills_score": 70,
+        "experience_score": 95,
+        "education_score": 90,
+        "matched_skills": ["PostgreSQL", "SQL"],
+        "missing_skills": ["Java"],
+        "strengths": ["Long finance-close experience and a strong database record"],
+        "concerns": ["Primary stack is Python, not the Java services this role owns"],
+        "summary": "Deep experience, held just outside the top 3 by the skills weight."
+      }
+    },
+    {
+      "candidate_id": "rita-holm",
+      "profile": {
+        "skills": ["Java", "REST"],
+        "years_of_experience": 4,
+        "work_history": [
+          {
+            "company": "Brightpath",
+            "role": "Backend Engineer",
+            "duration": "2022 - Present",
+            "description": "Built internal REST services for an HR product."
+          }
+        ],
+        "education": [
+          {
+            "institution": "University of Minnesota",
+            "degree": "B.A.",
+            "field_of_study": "Information Systems",
+            "duration": "2014 - 2018"
+          }
+        ]
+      },
+      "assessment": {
+        "skills_score": 75,
+        "experience_score": 50,
+        "education_score": 40,
+        "matched_skills": ["Java", "REST"],
+        "missing_skills": ["PostgreSQL"],
+        "strengths": ["Has shipped Java HTTP services"],
+        "concerns": ["No billing domain and little database ownership"],
+        "summary": "Partial stack match with limited years on similar systems."
+      }
+    },
+    {
+      "candidate_id": "owen-park",
+      "profile": {
+        "skills": ["Java", "Kafka"],
+        "years_of_experience": 3,
+        "work_history": [
+          {
+            "company": "Relay",
+            "role": "Software Engineer",
+            "duration": "2023 - Present",
+            "description": "Worked on event consumers for a messaging product."
+          }
+        ],
+        "education": [
+          {
+            "institution": "Purdue University",
+            "degree": "B.S.",
+            "field_of_study": "Computer Science",
+            "duration": "2016 - 2020"
+          }
+        ]
+      },
+      "assessment": {
+        "skills_score": 85,
+        "experience_score": 40,
+        "education_score": 30,
+        "matched_skills": ["Java"],
+        "missing_skills": ["PostgreSQL", "REST"],
+        "strengths": ["Java in production"],
+        "concerns": ["Short tenure and no billing or relational-database work"],
+        "summary": "Skills overlap is real, experience on this kind of system is thin."
+      }
+    },
+    {
+      "candidate_id": "leila-haddad",
+      "profile": {
+        "skills": ["Go", "PostgreSQL"],
+        "years_of_experience": 6,
+        "work_history": [
+          {
+            "company": "Kit",
+            "role": "Backend Engineer",
+            "duration": "2020 - Present",
+            "description": "Built account services in Go with PostgreSQL."
+          }
+        ],
+        "education": [
+          {
+            "institution": "American University of Beirut",
+            "degree": "B.E.",
+            "field_of_study": "Computer Engineering",
+            "duration": "2012 - 2017"
+          }
+        ]
+      },
+      "assessment": {
+        "skills_score": 60,
+        "experience_score": 60,
+        "education_score": 60,
+        "matched_skills": ["PostgreSQL"],
+        "missing_skills": ["Java"],
+        "strengths": ["Database-backed services in production"],
+        "concerns": ["Different language and no billing domain"],
+        "summary": "Even mid-pack scores, not a top-3 profile for this job."
+      }
+    },
+    {
+      "candidate_id": "marco-silva",
+      "profile": {
+        "skills": ["JavaScript", "React"],
+        "years_of_experience": 6,
+        "work_history": [
+          {
+            "company": "Folio",
+            "role": "Full Stack Engineer",
+            "duration": "2019 - Present",
+            "description": "Built the customer web app and a few supporting endpoints."
+          }
+        ],
+        "education": [
+          {
+            "institution": "University of Lisbon",
+            "degree": "B.S.",
+            "field_of_study": "Computer Science",
+            "duration": "2013 - 2017"
+          }
+        ]
+      },
+      "assessment": {
+        "skills_score": 50,
+        "experience_score": 55,
+        "education_score": 45,
+        "matched_skills": [],
+        "missing_skills": ["Java", "PostgreSQL"],
+        "strengths": ["Has worked next to a backend team"],
+        "concerns": ["Day-to-day work is the web client, not the billing services"],
+        "summary": "Frontend-heavy profile for a backend role."
+      }
+    },
+    {
+      "candidate_id": "hana-bergstrom",
+      "profile": {
+        "skills": ["Excel", "SQL"],
+        "years_of_experience": 10,
+        "work_history": [
+          {
+            "company": "Marlow",
+            "role": "Billing Operations",
+            "duration": "2016 - Present",
+            "description": "Closed the books in spreadsheets and wrote the SQL the finance team reuses."
+          }
+        ],
+        "education": [
+          {
+            "institution": "Stockholm University",
+            "degree": "B.S.",
+            "field_of_study": "Business",
+            "duration": "2008 - 2012"
+          }
+        ]
+      },
+      "assessment": {
+        "skills_score": 40,
+        "experience_score": 70,
+        "education_score": 50,
+        "matched_skills": ["SQL"],
+        "missing_skills": ["Java", "REST"],
+        "strengths": ["Knows the billing close from the operations side"],
+        "concerns": ["Has not built the services the role is hired to own"],
+        "summary": "Domain familiarity without the engineering stack."
+      }
+    },
+    {
+      "candidate_id": "chris-okello",
+      "profile": {
+        "skills": ["Python"],
+        "years_of_experience": 2,
+        "work_history": [
+          {
+            "company": "Campus Lab",
+            "role": "Junior Developer",
+            "duration": "2024 - Present",
+            "description": "Course projects and a part-time internal tool."
+          }
+        ],
+        "education": [
+          {
+            "institution": "University of Nairobi",
+            "degree": "B.S.",
+            "field_of_study": "Computer Science",
+            "duration": "2019 - 2023"
+          }
+        ]
+      },
+      "assessment": {
+        "skills_score": 30,
+        "experience_score": 40,
+        "education_score": 90,
+        "matched_skills": [],
+        "missing_skills": ["Java", "PostgreSQL", "REST"],
+        "strengths": ["Recent computer science degree"],
+        "concerns": ["Little professional backend experience on this stack"],
+        "summary": "Education score is high and does not outweigh the skills gap."
+      }
+    }
+  ]
+}

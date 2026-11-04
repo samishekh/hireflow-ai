@@ -64,6 +64,14 @@ With the stack up and both services in mock mode:
 
 The script creates a job, uploads `scripts/fixtures/one.pdf` and `scripts/fixtures/two.pdf`, and expects both candidates to finish at `overall_score` 67.0 with model `mock`. It then records an accepted override and checks that the decision is stored while the score and ranks stay the same. A real API key fails those fixed scores.
 
+## CI
+
+GitHub Actions runs on every pull request and on every push to `master`. Pytest covers the parser and the matcher, including the contract tests against `contracts/`. `core-api` runs JUnit, Testcontainers, and WireMock. The web UI runs its tests and the TypeScript build.
+
+`evaluation/` is the matcher's pinned shortlist: one job and ten blind profiles, with recorded sub-scores. The matcher tests set `HIREFLOW_RECORDED_SCORES` and score them through `POST /score` with formula `v1`. No API key is used. The job fails if the top 3 is not `ava-chen`, `noah-ibrahim`, and `lena-okoye` at 91.0, 86.8, and 82.5. `samir-dalal` is fourth at 81.8, close enough that a weight change can move the top 3.
+
+A push to `master` publishes the four images to GHCR as `ghcr.io/<owner>/hireflow-ai/<service>:latest` and a tag for the commit. The workflow uses `GITHUB_TOKEN`. No Claude key is stored in Actions.
+
 ## Pipeline
 
 `core-api` runs each upload through parse, score, and compare. Name, email, and phone stay in PostgreSQL. The matcher receives the normalized job description and a blind profile only. `overall_score` and `formula_version` are stored as the matcher returns them. A second identical blind profile reuses the stored score.

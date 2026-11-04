@@ -84,6 +84,7 @@ def _tool_response(payload: dict, name: str) -> _Response:
 
 @pytest.fixture
 def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    monkeypatch.delenv("HIREFLOW_RECORDED_SCORES", raising=False)
     monkeypatch.setattr(main, "Anthropic", _Anthropic)
     _Anthropic.constructed = 0
     _Anthropic.calls = []
