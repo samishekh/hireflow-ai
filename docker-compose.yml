@@ -66,5 +66,19 @@ services:
       retries: 30
       start_period: 40s
 
+  web-ui:
+    build: ./web-ui
+    ports:
+      - "5173:80"
+    depends_on:
+      core-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
 volumes:
   postgres-data:

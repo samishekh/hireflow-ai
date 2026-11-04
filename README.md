@@ -9,7 +9,7 @@ A recruiter creates a job, uploads CV PDFs, and gets a ranked shortlist with rea
 | `resume-parser-service` | Python FastAPI. PDF to structured candidate data. Port 8000. | Built |
 | `job-matcher-service` | Python FastAPI. Scores a parsed CV, then compares the top candidates. Port 8001. | Built |
 | `core-api` | Java Spring Boot. Jobs, uploads, orchestration, PostgreSQL. Port 8080. | Built |
-| `web-ui` | React + Vite. Create a job, upload CVs, watch status, read rankings, record an override. | Not started |
+| `web-ui` | React + Vite. Create a job, upload CVs, watch the pipeline, read rankings and the comparison, record an override. Port 5173. | Built |
 
 ## Run
 
@@ -19,7 +19,7 @@ From the repo root:
 docker compose up --build
 ```
 
-Compose starts Postgres, the parser, the matcher, and `core-api`. Stop with `docker compose down`.
+Compose starts Postgres, the parser, the matcher, `core-api`, and the web UI. Stop with `docker compose down`.
 
 | | |
 | --- | --- |
@@ -27,6 +27,19 @@ Compose starts Postgres, the parser, the matcher, and `core-api`. Stop with `doc
 | Matcher | [http://localhost:8001/docs](http://localhost:8001/docs) |
 | Core API | [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html) |
 | Health | [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health) |
+| Web UI | [http://localhost:5173](http://localhost:5173) |
+
+The UI is served by nginx in Compose and calls `core-api` on the same origin. A role is a full posting: overview, responsibilities, requirements, and nice-to-haves. The pipeline page polls rankings and slides each CV across Pending, Parsing, Scoring, Comparing, and Done. Compare is a separate page for the top-five reasons. Rankings keep the weighted score next to any recruiter decision.
+
+To work on the UI without rebuilding the image, with `core-api` already on port 8080:
+
+```bash
+cd web-ui
+npm install
+npm run dev
+```
+
+The dev server proxies `/api` to `http://localhost:8080`.
 
 ### Claude or mock
 
