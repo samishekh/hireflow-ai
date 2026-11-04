@@ -43,16 +43,13 @@ export function SkillChips({ score }: { score: Score }) {
 }
 
 function ChipRow({ label, items, className }: { label: string; items: string[]; className: string }) {
-  const shown = items.slice(0, 8)
-  const rest = items.length - shown.length
   return (
     <div className="chip-line">
       <span className="chip-label">{label}</span>
       <div className="chips">
-        {shown.map((item, index) => (
+        {items.map((item, index) => (
           <span key={`${item}-${index}`} className={className}>{item}</span>
         ))}
-        {rest > 0 ? <span className="chip">+{rest}</span> : null}
       </div>
     </div>
   )
