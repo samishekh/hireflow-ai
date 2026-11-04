@@ -1,5 +1,6 @@
 import { useRef, useState, type DragEvent } from 'react'
 import { api, ApiError } from '../api'
+import { isPdf } from '../pdfFile'
 import { useLive } from '../live'
 import { useToast } from '../toast'
 
@@ -101,8 +102,3 @@ function validate(files: File[]): string | null {
   return null
 }
 
-function isPdf(file: File): boolean {
-  const nameOk = file.name.toLowerCase().endsWith('.pdf')
-  const typeOk = file.type === '' || file.type === 'application/pdf'
-  return nameOk && typeOk
-}

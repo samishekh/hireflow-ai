@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { api, ApiError } from './api'
+import { lookupCandidateNames } from './candidateNames'
 import { IN_FLIGHT } from './format'
 import { useToast } from './toast'
 import type { Ranking } from './types'
@@ -54,27 +55,14 @@ export function LiveProvider({ jobId, children }: { jobId: string; children: Rea
       }
     }
     setRows(next)
-    const need = next
-      .filter((row) => (row.status === 'done' || row.status === 'failed') && !namesAsked.current.has(row.id))
-      .map((row) => row.id)
-    if (need.length === 0) return
-    for (const id of need) namesAsked.current.add(id)
-    void Promise.all(
-      need.map(async (id) => {
-        try {
-          const candidate = await api.candidate(id)
-          return [id, candidate.parsed_data?.candidate_name?.trim() ?? ''] as const
-        } catch {
-          return [id, ''] as const
-        }
-      }),
-    ).then((pairs) => {
-      if (!mounted.current) return
+    const ids = next.filter((row) => row.status === 'done' || row.status === 'failed').map((row) => row.id)
+    void lookupCandidateNames(ids, namesAsked.current, (id) => api.candidate(id)).then((pairs) => {
+      if (!mounted.current || pairs.length === 0) return
       setNames((current) => {
         let changed = false
         const copy = { ...current }
         for (const [id, name] of pairs) {
-          if (name && copy[id] !== name) {
+          if (copy[id] !== name) {
             copy[id] = name
             changed = true
           }
