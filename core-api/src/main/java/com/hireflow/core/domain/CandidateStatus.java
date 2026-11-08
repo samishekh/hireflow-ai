@@ -4,7 +4,6 @@ public enum CandidateStatus {
     pending,
     parsing,
     scoring,
-    comparing,
     done,
     failed
 }

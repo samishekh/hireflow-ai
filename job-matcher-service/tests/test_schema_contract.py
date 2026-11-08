@@ -20,17 +20,5 @@ def test_score_response_schema_matches_contract():
     assert _load("score-response.schema.json") == main.json_schema_for(main.ScoreResponse)
 
 
-def test_compare_request_schema_matches_contract():
-    assert _load("compare-request.schema.json") == main.json_schema_for(main.CompareRequest)
-
-
-def test_compare_response_schema_matches_contract():
-    assert _load("compare-response.schema.json") == main.json_schema_for(main.CompareResponse)
-
-
 def test_score_tool_schema_matches_contract():
     assert main.SCORE_TOOL_SCHEMA["input_schema"] == _load("score-candidate-tool.schema.json")
-
-
-def test_compare_tool_schema_matches_contract():
-    assert main.COMPARE_TOOL_SCHEMA["input_schema"] == _load("compare-candidates-tool.schema.json")

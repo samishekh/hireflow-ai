@@ -22,7 +22,6 @@ import com.hireflow.core.persistence.MatchResultEntity;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
@@ -54,9 +53,6 @@ class PipelineServiceTest {
     @Mock
     private CacheKeyFactory cacheKeys;
 
-    @Mock
-    private BatchTracker batches;
-
     @InjectMocks
     private PipelineService pipeline;
 
@@ -66,14 +62,13 @@ class PipelineServiceTest {
         byte[] pdf = pdf();
         ParsedResume parsed = resume();
         ScoreResponse score = score(candidateId);
-        UploadBatch batch = batch(candidateId);
         passThroughRemoteCalls();
         when(store.findParsedCopy(candidateId, Digests.sha256(pdf))).thenReturn(Optional.empty());
         when(parser.parse(FILENAME, pdf)).thenReturn(new ParseResumeResponse("raw text", parsed));
         stubScoring(candidateId, Optional.empty());
         when(matcher.score(any(ScoreRequest.class))).thenReturn(score);
 
-        pipeline.processCandidate(candidateId, FILENAME, pdf, batch);
+        pipeline.processCandidate(candidateId, FILENAME, pdf);
 
         InOrder order = Mockito.inOrder(parser, matcher);
         order.verify(parser).parse(FILENAME, pdf);
@@ -86,10 +81,10 @@ class PipelineServiceTest {
         verify(store, times(2)).incrementAttempt(candidateId);
         verify(store).saveParsed(candidateId, "raw text", parsed);
         verify(store).saveScore(candidateId, score, "cache-key");
+        verify(store).markDone(List.of(candidateId));
         verify(cacheKeys).cacheKey("description-hash", BlindCandidate.from(parsed));
         verify(store, never()).copyScore(any(), any(), any());
         verify(store, never()).markFailed(any(UUID.class), any());
-        verify(batches).finished(batch, candidateId);
     }
 
     @Test
@@ -98,21 +93,20 @@ class PipelineServiceTest {
         byte[] pdf = pdf();
         ParsedResume parsed = resume();
         ScoreResponse score = score(candidateId);
-        UploadBatch batch = batch(candidateId);
         passThroughRemoteCalls();
         when(store.findParsedCopy(candidateId, Digests.sha256(pdf)))
                 .thenReturn(Optional.of(new CandidateTx.ParsedCopy("cached text", parsed)));
         stubScoring(candidateId, Optional.empty());
         when(matcher.score(any(ScoreRequest.class))).thenReturn(score);
 
-        pipeline.processCandidate(candidateId, FILENAME, pdf, batch);
+        pipeline.processCandidate(candidateId, FILENAME, pdf);
 
         verify(parser, never()).parse(anyString(), any(byte[].class));
         verify(store).saveParsed(candidateId, "cached text", parsed);
         verify(store, times(1)).incrementAttempt(candidateId);
         verify(matcher).score(any(ScoreRequest.class));
         verify(store).saveScore(candidateId, score, "cache-key");
-        verify(batches).finished(batch, candidateId);
+        verify(store).markDone(List.of(candidateId));
     }
 
     @Test
@@ -121,7 +115,6 @@ class PipelineServiceTest {
         UUID sourceCandidateId = UUID.randomUUID();
         byte[] pdf = pdf();
         ParsedResume parsed = resume();
-        UploadBatch batch = batch(candidateId);
         MatchResultEntity cached = new MatchResultEntity();
         cached.setCandidateId(sourceCandidateId);
         passThroughRemoteCalls();
@@ -129,31 +122,30 @@ class PipelineServiceTest {
         when(parser.parse(FILENAME, pdf)).thenReturn(new ParseResumeResponse("raw text", parsed));
         stubScoring(candidateId, Optional.of(cached));
 
-        pipeline.processCandidate(candidateId, FILENAME, pdf, batch);
+        pipeline.processCandidate(candidateId, FILENAME, pdf);
 
         verify(parser).parse(FILENAME, pdf);
         verify(store).copyScore(candidateId, sourceCandidateId, "cache-key");
+        verify(store).markDone(List.of(candidateId));
         verify(matcher, never()).score(any());
         verify(store, never()).saveScore(any(), any(), any());
         verify(store, times(1)).incrementAttempt(candidateId);
-        verify(batches).finished(batch, candidateId);
     }
 
     @Test
     void anyExceptionMarksFailedAndFinishesTheBatch() {
         UUID candidateId = UUID.randomUUID();
         byte[] pdf = pdf();
-        UploadBatch batch = batch(candidateId);
         passThroughRemoteCalls();
         when(store.findParsedCopy(candidateId, Digests.sha256(pdf))).thenReturn(Optional.empty());
         when(parser.parse(FILENAME, pdf)).thenThrow(new IllegalStateException("parser exploded"));
 
-        pipeline.processCandidate(candidateId, FILENAME, pdf, batch);
+        pipeline.processCandidate(candidateId, FILENAME, pdf);
 
         verify(store).markFailed(candidateId, "parser exploded");
         verify(matcher, never()).score(any());
         verify(store, never()).saveScore(any(), any(), any());
-        verify(batches).finished(batch, candidateId);
+        verify(store, never()).markDone(any());
     }
 
     private void stubScoring(UUID candidateId, Optional<MatchResultEntity> cachedScore) {
@@ -168,10 +160,6 @@ class PipelineServiceTest {
         doAnswer(invocation -> ((Supplier<Object>) invocation.getArgument(0)).get())
                 .when(remoteCall)
                 .execute(any());
-    }
-
-    private static UploadBatch batch(UUID candidateId) {
-        return new UploadBatch(UUID.randomUUID(), Set.of(candidateId));
     }
 
     private static byte[] pdf() {

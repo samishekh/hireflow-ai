@@ -6,10 +6,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.introspect.BeanPropertyDefinition;
-import com.hireflow.core.client.CompareCandidate;
-import com.hireflow.core.client.CompareRequest;
-import com.hireflow.core.client.CompareResponse;
-import com.hireflow.core.client.ComparisonEntry;
 import com.hireflow.core.client.ParseResumeResponse;
 import com.hireflow.core.client.ScoreRequest;
 import com.hireflow.core.client.ScoreResponse;
@@ -42,7 +38,6 @@ class JsonContractTest {
     private static final Path CONTRACTS = contractsDirectory();
 
     private static final UUID FIRST_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
-    private static final UUID SECOND_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
 
     @Test
     void parseResumeResponseMatchesContract() throws Exception {
@@ -75,29 +70,6 @@ class JsonContractTest {
         assertProperties(schema, ScoreResponse.class);
 
         assertValid(schema, scoreResponse());
-    }
-
-    @Test
-    void compareRequestMatchesContract() throws Exception {
-        JsonNode schema = readSchema("matcher/compare-request.schema.json");
-
-        assertProperties(schema, CompareRequest.class);
-        assertProperties(schema.at("/properties/candidates/items"), CompareCandidate.class);
-        assertProperties(
-                schema.at("/properties/candidates/items/properties/work_history/items"), WorkExperience.class);
-        assertProperties(schema.at("/properties/candidates/items/properties/education/items"), Education.class);
-
-        assertValid(schema, compareRequest());
-    }
-
-    @Test
-    void compareResponseMatchesContract() throws Exception {
-        JsonNode schema = readSchema("matcher/compare-response.schema.json");
-
-        assertProperties(schema, CompareResponse.class);
-        assertProperties(schema.at("/properties/rankings/items"), ComparisonEntry.class);
-
-        assertValid(schema, compareResponse());
     }
 
     private static void assertProperties(JsonNode schema, Class<?> type) {
@@ -191,38 +163,6 @@ class JsonContractTest {
                 List.of("short tenure"),
                 "solid backend fit",
                 "v1",
-                "mock");
-    }
-
-    private static CompareRequest compareRequest() {
-        CompareCandidate first = new CompareCandidate(
-                FIRST_ID,
-                List.of("Java"),
-                6.5,
-                List.of(work()),
-                List.of(education()),
-                80.0,
-                70.0,
-                60.0,
-                "solid backend fit");
-        CompareCandidate second = new CompareCandidate(
-                SECOND_ID,
-                List.of("Go"),
-                4.0,
-                List.of(new WorkExperience("Northwind", "Developer", "2021 - 2024", "Shipped services")),
-                List.of(new Education("City College", "B.A.", "Mathematics", "2014 - 2018")),
-                75.0,
-                65.0,
-                55.0,
-                "stronger skills");
-        return new CompareRequest("Backend engineer", List.of(first, second));
-    }
-
-    private static CompareResponse compareResponse() {
-        return new CompareResponse(
-                List.of(
-                        new ComparisonEntry(FIRST_ID, 1, "Stronger skills match"),
-                        new ComparisonEntry(SECOND_ID, 2, "Less relevant experience")),
                 "mock");
     }
 

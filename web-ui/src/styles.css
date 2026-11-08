@@ -106,7 +106,7 @@ h3 {
 
 .btn-ink { background: var(--ink-on-yellow); color: var(--yellow); }
 
-button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+button:focus-visible, a:focus-visible, [role="button"]:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
   outline: 2px solid var(--yellow);
   outline-offset: 3px;
 }
@@ -136,7 +136,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .stat { margin: 0; font-size: 76px; line-height: 0.85; letter-spacing: -0.05em; }
 .num { font-variant-numeric: tabular-nums; }
 
-.card, .job-card, .pipe-row, .rank-card, .compare-card {
+.card, .job-card, .pipe-item, .rank-card {
   border-radius: 28px;
   background: var(--card);
   box-shadow: var(--shadow), inset 0 0 0 1px var(--line);
@@ -243,7 +243,7 @@ textarea { min-height: 140px; resize: vertical; }
   animation: pulse 1.2s ease-in-out infinite;
 }
 
-.role-head, .pipe-top, .rank-title, .outside-list li, .back-link {
+.role-head, .pipe-top, .rank-title, .back-link {
   display: flex;
   justify-content: space-between;
   gap: 16px;
@@ -321,15 +321,21 @@ textarea { min-height: 140px; resize: vertical; }
 .pipe-scroll { overflow-x: auto; }
 .pipe-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
 
-.pipe-row {
-  display: block;
+.pipe-item {
   padding: 16px 18px 14px;
   color: inherit;
+}
+
+.pipe-name {
+  color: inherit;
+  font-weight: 700;
   text-decoration: none;
 }
 
+.pipe-name:hover { color: var(--yellow); }
+
 .pipe-top > div:first-child { min-width: 0; }
-.pipe-top strong, .pipe-top span { display: block; }
+.pipe-top strong, .pipe-top span, .pipe-name { display: block; }
 .pipe-score { flex: none; }
 .pipe-top span { color: var(--muted); font-size: 13px; }
 
@@ -349,7 +355,7 @@ textarea { min-height: 140px; resize: vertical; }
 .phase-marker {
   position: absolute;
   top: 0;
-  left: calc(10% + var(--step) * 20%);
+  left: calc(12.5% + var(--step) * 25%);
   transform: translateX(-50%);
   padding: 5px 10px;
   border-radius: 999px;
@@ -366,7 +372,7 @@ textarea { min-height: 140px; resize: vertical; }
 .track {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   align-items: center;
   height: 18px;
 }
@@ -374,8 +380,8 @@ textarea { min-height: 140px; resize: vertical; }
 .track::before {
   content: "";
   position: absolute;
-  left: 10%;
-  right: 10%;
+  left: 12.5%;
+  right: 12.5%;
   top: 50%;
   height: 3px;
   border-radius: 999px;
@@ -385,10 +391,10 @@ textarea { min-height: 140px; resize: vertical; }
 
 .track-fill {
   position: absolute;
-  left: 10%;
+  left: 12.5%;
   top: 50%;
   height: 3px;
-  width: calc(var(--step) * 20%);
+  width: calc(var(--step) * 25%);
   border-radius: 999px;
   background: var(--yellow);
   transform: translateY(-50%);
@@ -412,7 +418,7 @@ textarea { min-height: 140px; resize: vertical; }
 
 .phase-names {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   margin: 6px 0 0;
   padding: 0;
   list-style: none;
@@ -428,7 +434,7 @@ textarea { min-height: 140px; resize: vertical; }
 .empty-copy, .empty-card p { color: var(--muted); }
 .empty-card { display: grid; gap: 8px; justify-items: start; }
 
-.rank-list, .compare-list, .outside-list, .timeline {
+.rank-list, .timeline {
   display: grid;
   gap: 12px;
   margin: 0;
@@ -436,24 +442,12 @@ textarea { min-height: 140px; resize: vertical; }
   list-style: none;
 }
 
-.rank-card, .compare-card { display: grid; gap: 16px; padding: 18px; }
-.rank-card { grid-template-columns: 112px minmax(0, 1fr); }
-.compare-card { grid-template-columns: 84px minmax(0, 1fr) 112px; align-items: start; }
-
-.compare-card.lead {
-  background: var(--yellow);
-  color: var(--ink-on-yellow);
-}
-
-.rank-no { font-size: 40px; font-weight: 700; letter-spacing: -0.04em; color: var(--yellow); }
-.lead .rank-no, .lead .score-hero, .lead h2, .lead .filename, .lead .reason { color: var(--ink-on-yellow); }
+.rank-card { display: grid; gap: 16px; padding: 18px; grid-template-columns: 112px minmax(0, 1fr); }
 
 .score-hero { display: grid; justify-items: center; align-content: start; }
 .score-hero .num { font-size: 36px; font-weight: 700; line-height: 1; }
-.score-hero small, .filename { color: var(--muted); }
-.lead .score-hero small, .lead .filename { color: rgba(22, 20, 12, 0.7); }
+.score-hero small { color: var(--muted); }
 
-.reason { margin: 8px 0 12px; font-size: 18px; line-height: 1.35; }
 .rank-title h2 { margin: 0; }
 .rank-title a { color: inherit; text-decoration: none; }
 .status-line { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -463,9 +457,6 @@ textarea { min-height: 140px; resize: vertical; }
 .bar-label { grid-column: 1 / -1; display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
 .bar-track { height: 8px; border-radius: 999px; background: #2a2a2a; overflow: hidden; }
 .bar-fill { display: block; height: 100%; background: var(--yellow); transition: width 680ms cubic-bezier(0.22, 1, 0.36, 1); }
-.lead .bar-label, .lead .muted { color: rgba(22, 20, 12, 0.68); }
-.lead .bar-track { background: rgba(22, 20, 12, 0.15); }
-.lead .bar-fill { background: var(--ink-on-yellow); }
 
 .chip-groups { display: grid; gap: 8px; }
 .chip-line { display: grid; gap: 6px; }
@@ -481,9 +472,6 @@ textarea { min-height: 140px; resize: vertical; }
 
 .formula, .model-line, .blind-note { font-size: 13px; }
 .evidence ul { margin: 0; padding-left: 1.1rem; display: grid; gap: 4px; }
-
-.outside-list li { align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
-.outside-list a { color: var(--yellow); font-weight: 700; text-decoration: none; }
 
 .facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0; }
 .facts div { padding: 12px; border-radius: 16px; background: #0c0c0e; }
@@ -591,7 +579,7 @@ textarea { min-height: 140px; resize: vertical; }
 }
 
 @media (max-width: 900px) {
-  .composer, .work, .profile, .rank-card, .compare-card, .split-fields, .facts {
+  .composer, .work, .profile, .rank-card, .split-fields, .facts {
     grid-template-columns: 1fr;
   }
   .phase-names { font-size: 10px; }

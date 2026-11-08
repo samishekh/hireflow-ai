@@ -53,12 +53,6 @@ public class MatchResultEntity {
     @Column(name = "formula_version", nullable = false, length = 32)
     private String formulaVersion;
 
-    @Column(name = "comparison_rank")
-    private Integer comparisonRank;
-
-    @Column(name = "comparison_reason", columnDefinition = "text")
-    private String comparisonReason;
-
     @Column(nullable = false, length = 128)
     private String model;
 
@@ -154,22 +148,6 @@ public class MatchResultEntity {
 
     public void setFormulaVersion(String formulaVersion) {
         this.formulaVersion = formulaVersion;
-    }
-
-    public Integer getComparisonRank() {
-        return comparisonRank;
-    }
-
-    public void setComparisonRank(Integer comparisonRank) {
-        this.comparisonRank = comparisonRank;
-    }
-
-    public String getComparisonReason() {
-        return comparisonReason;
-    }
-
-    public void setComparisonReason(String comparisonReason) {
-        this.comparisonReason = comparisonReason;
     }
 
     public String getModel() {

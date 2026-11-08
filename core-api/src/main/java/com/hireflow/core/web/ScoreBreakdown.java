@@ -13,7 +13,5 @@ public record ScoreBreakdown(
         List<String> concerns,
         String summary,
         String formulaVersion,
-        Integer comparisonRank,
-        String comparisonReason,
         String model) {
 }

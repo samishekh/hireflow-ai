@@ -109,11 +109,6 @@ abstract class PipelineTestSupport {
                 .willReturn(okJson(scoreJson(skills, experience, education, overall))));
     }
 
-    static void stubCompare() {
-        WIRE_MOCK.stubFor(post(urlEqualTo("/compare"))
-                .willReturn(aResponse().withTransformers(CompareRankingsTransformer.NAME)));
-    }
-
     UUID createJob(String title) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -258,7 +253,7 @@ abstract class PipelineTestSupport {
         WireMockServer server = new WireMockServer(wireMockConfig()
                 .dynamicPort()
                 .http2PlainDisabled(true)
-                .extensions(new CompareRankingsTransformer(), new HoldParseTransformer()));
+                .extensions(new HoldParseTransformer()));
         server.start();
         return server;
     }

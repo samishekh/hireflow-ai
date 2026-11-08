@@ -141,8 +141,6 @@ public class CandidateQueryService {
                 score.getConcerns(),
                 score.getSummary(),
                 score.getFormulaVersion(),
-                score.getComparisonRank(),
-                score.getComparisonReason(),
                 score.getModel());
     }
 

@@ -2,7 +2,6 @@ export type CandidateStatus =
   | 'pending'
   | 'parsing'
   | 'scoring'
-  | 'comparing'
   | 'done'
   | 'failed'
 
@@ -19,8 +18,6 @@ export type Score = {
   concerns: string[]
   summary: string
   formula_version: string
-  comparison_rank: number | null
-  comparison_reason: string | null
   model: string
 }
 

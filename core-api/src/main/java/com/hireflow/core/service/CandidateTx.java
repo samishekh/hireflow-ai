@@ -1,9 +1,7 @@
 package com.hireflow.core.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.hireflow.core.client.ComparisonEntry;
 import com.hireflow.core.client.ScoreResponse;
-import com.hireflow.core.domain.BlindCandidate;
 import com.hireflow.core.domain.CandidateStatus;
 import com.hireflow.core.domain.ParsedResume;
 import com.hireflow.core.persistence.CandidateEntity;
@@ -15,10 +13,7 @@ import com.hireflow.core.persistence.MatchResultRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -134,8 +129,6 @@ public class CandidateTx {
         copy.setFormulaVersion(source.getFormulaVersion());
         copy.setModel(source.getModel());
         copy.setCacheKey(cacheKey);
-        copy.setComparisonRank(null);
-        copy.setComparisonReason(null);
         copy.setCreatedAt(Instant.now());
         matches.save(copy);
     }
@@ -175,24 +168,6 @@ public class CandidateTx {
     }
 
     @Transactional
-    public void failInFlight(Collection<UUID> candidateIds, String message) {
-        String stored = truncate(message);
-        for (CandidateEntity candidate : candidates.findAllById(candidateIds)) {
-            if (candidate.getStatus() == CandidateStatus.scoring || candidate.getStatus() == CandidateStatus.comparing) {
-                candidate.setStatus(CandidateStatus.failed);
-                candidate.setErrorMessage(stored);
-            }
-        }
-    }
-
-    @Transactional
-    public void markComparing(Collection<UUID> candidateIds) {
-        for (CandidateEntity candidate : candidates.findAllById(candidateIds)) {
-            candidate.setStatus(CandidateStatus.comparing);
-        }
-    }
-
-    @Transactional
     public void markDone(Collection<UUID> candidateIds) {
         if (candidateIds.isEmpty()) {
             return;
@@ -201,53 +176,6 @@ public class CandidateTx {
             candidate.setStatus(CandidateStatus.done);
             candidate.setErrorMessage(null);
         }
-    }
-
-    @Transactional
-    public void clearComparison(UUID jobId) {
-        matches.clearComparisonForJob(jobId);
-    }
-
-    @Transactional
-    public void applyComparison(List<ComparisonEntry> rankings) {
-        for (ComparisonEntry entry : rankings) {
-            MatchResultEntity row = matches.findById(entry.candidateId())
-                    .orElseThrow(() -> new PermanentException("Comparison referenced an unknown candidate"));
-            row.setComparisonRank(entry.rank());
-            row.setComparisonReason(entry.reason());
-        }
-    }
-
-    @Transactional(readOnly = true)
-    public List<ScoredCandidate> loadScored(UUID jobId) {
-        List<CandidateEntity> rows = candidates.findByJobIdOrderByCreatedAtAsc(jobId);
-        if (rows.isEmpty()) {
-            return List.of();
-        }
-        Map<UUID, CandidateEntity> byId = new HashMap<>();
-        for (CandidateEntity row : rows) {
-            byId.put(row.getId(), row);
-        }
-        List<ScoredCandidate> scored = new ArrayList<>();
-        for (MatchResultEntity match : matches.findByCandidateIdIn(byId.keySet())) {
-            CandidateEntity candidate = byId.get(match.getCandidateId());
-            if (candidate == null || candidate.getParsedData() == null) {
-                continue;
-            }
-            BlindCandidate blind = ResumeChecks.blind(candidate.getParsedData());
-            scored.add(new ScoredCandidate(
-                    candidate.getId(),
-                    candidate.getCreatedAt(),
-                    match.getOverallScore(),
-                    blind,
-                    match.getSkillsScore(),
-                    match.getExperienceScore(),
-                    match.getEducationScore(),
-                    match.getSummary()));
-        }
-        scored.sort(Comparator.comparingDouble(ScoredCandidate::overallScore).reversed()
-                .thenComparing(ScoredCandidate::createdAt));
-        return scored;
     }
 
     public CandidateEntity requireCandidate(UUID candidateId) {

@@ -37,11 +37,6 @@ export function RankingsPage() {
               </div>
               <p className="status-line">
                 <span className={row.status === 'failed' ? 'pill pill-bad' : 'pill'}>{statusLabel(row.status)}</span>
-                {row.score?.comparison_rank != null ? (
-                  <Link className="pill" to={`/jobs/${jobId}/compare`}>
-                    Compare rank {row.score.comparison_rank}
-                  </Link>
-                ) : null}
                 {row.override ? (
                   <span className={row.override.decision === 'accepted' ? 'pill pill-ok' : 'pill pill-bad'}>
                     {decisionLabel(row.override.decision)}

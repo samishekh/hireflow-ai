@@ -12,7 +12,7 @@ from typing import Any, TypeVar
 from anthropic import Anthropic, APIError, APIStatusError
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 load_dotenv()
 
@@ -26,7 +26,6 @@ T = TypeVar("T", bound=BaseModel)
 
 DEFAULT_CLAUDE_MODEL = "claude-sonnet-5-5"
 SCORE_TOOL = "score_candidate"
-COMPARE_TOOL = "compare_candidates"
 FORMULA_VERSION = "v1"
 MOCK_MODEL = "mock"
 RECORDED_MODEL = "recorded"
@@ -36,9 +35,6 @@ EDUCATION_WEIGHT = Decimal("0.15")
 MOCK_SKILLS_SCORE = 80.0
 MOCK_EXPERIENCE_SCORE = 60.0
 MOCK_EDUCATION_SCORE = 40.0
-MOCK_COMPARE_REASON = "Mock comparison keeps the input order."
-MIN_COMPARE_CANDIDATES = 2
-MAX_COMPARE_CANDIDATES = 5
 
 _SCHEMA_KEY_ORDER = (
     "description",
@@ -122,81 +118,6 @@ class ScoreResponse(BaseModel):
     model: str = Field(..., description="Claude model id, or mock when no API key is set")
 
 
-class CompareCandidate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    candidate_id: str = Field(..., min_length=1, description="Caller-supplied id for this candidate")
-    skills: list[str] = Field(..., description="Skills used for scoring")
-    years_of_experience: float = Field(..., description="Total years of professional experience")
-    work_history: list[WorkExperience] = Field(..., description="Work history without identity fields")
-    education: list[Education] = Field(..., description="Education history without identity fields")
-    skills_score: float = Field(..., ge=0, le=100, description="Skills sub-score from /score")
-    experience_score: float = Field(..., ge=0, le=100, description="Experience sub-score from /score")
-    education_score: float = Field(..., ge=0, le=100, description="Education sub-score from /score")
-    summary: str = Field(..., description="Scoring summary from /score")
-
-    @field_validator("candidate_id")
-    @classmethod
-    def reject_blank_id(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("must not be blank")
-        return value
-
-
-class CompareRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    job_description: str = Field(..., min_length=1, description="Job the candidates are compared against")
-    candidates: list[CompareCandidate] = Field(
-        ...,
-        min_length=MIN_COMPARE_CANDIDATES,
-        max_length=MAX_COMPARE_CANDIDATES,
-        description="Two to five already-scored blind candidates",
-    )
-
-    @field_validator("job_description")
-    @classmethod
-    def reject_blank_job(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("must not be blank")
-        return value
-
-    @model_validator(mode="after")
-    def unique_candidate_ids(self) -> CompareRequest:
-        ids = [candidate.candidate_id for candidate in self.candidates]
-        if len(ids) != len(set(ids)):
-            raise ValueError("candidate_id values must be unique")
-        return self
-
-
-class ComparisonEntry(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    candidate_id: str = Field(..., min_length=1, description="Id of a candidate from the request")
-    rank: int = Field(..., ge=1, description="1 is the best relative fit")
-    reason: str = Field(..., min_length=1, description="One-line reason for this rank")
-
-    @field_validator("candidate_id", "reason")
-    @classmethod
-    def reject_blank(cls, value: str) -> str:
-        if not value.strip():
-            raise ValueError("must not be blank")
-        return value
-
-
-class CompareAssessment(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    rankings: list[ComparisonEntry] = Field(..., description="Relative order of the candidates sent")
-
-
-class CompareResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    rankings: list[ComparisonEntry] = Field(..., description="Relative order, best rank first")
-    model: str = Field(..., description="Claude model id, or mock when no API key is set")
-
-
 def json_schema_for(model: type[BaseModel]) -> dict[str, Any]:
     """JSON Schema for a model, with nested models inlined and Pydantic titles removed."""
     schema = model.model_json_schema()
@@ -243,18 +164,9 @@ SCORE_TOOL_SCHEMA: dict[str, Any] = {
     "input_schema": json_schema_for(ScoreAssessment),
 }
 
-COMPARE_TOOL_SCHEMA: dict[str, Any] = {
-    "name": COMPARE_TOOL,
-    "description": (
-        "Rank the given candidates against one job. Rank 1 is the best fit. "
-        "Return each candidate id once with a one-line reason."
-    ),
-    "input_schema": json_schema_for(CompareAssessment),
-}
-
 app = FastAPI(
     title="Job Matcher Service",
-    description="Score a blind candidate against a job, then compare the top candidates.",
+    description="Score a blind candidate against a job.",
     version="1.0.0",
 )
 
@@ -416,50 +328,6 @@ def score_with_claude(request: ScoreRequest, api_key: str) -> ScoreResponse:
     return _score_from_assessment(request.candidate_id, assessment, model)
 
 
-def _expected_ranks(count: int) -> list[int]:
-    return list(range(1, count + 1))
-
-
-def validate_rankings(entries: list[ComparisonEntry], expected_ids: list[str]) -> list[ComparisonEntry]:
-    ids = [entry.candidate_id for entry in entries]
-    ranks = [entry.rank for entry in entries]
-    if len(ids) != len(set(ids)) or set(ids) != set(expected_ids) or sorted(ranks) != _expected_ranks(len(expected_ids)):
-        logger.error("Comparison ranking did not match candidates: ids=%s ranks=%s", ids, ranks)
-        raise HTTPException(
-            status_code=502,
-            detail="Comparison ranking did not match the candidates sent.",
-        )
-    return sorted(entries, key=lambda entry: entry.rank)
-
-
-def mock_compare(candidates: list[CompareCandidate]) -> CompareResponse:
-    logger.info("ANTHROPIC_API_KEY is missing; returning mock comparison for %s candidates", len(candidates))
-    rankings = [
-        ComparisonEntry(candidate_id=candidate.candidate_id, rank=index, reason=MOCK_COMPARE_REASON)
-        for index, candidate in enumerate(candidates, start=1)
-    ]
-    return CompareResponse(rankings=rankings, model=MOCK_MODEL)
-
-
-def compare_with_claude(request: CompareRequest, api_key: str) -> CompareResponse:
-    payload = {
-        "job_description": request.job_description,
-        "candidates": [candidate.model_dump() for candidate in request.candidates],
-    }
-    prompt = (
-        "Rank these candidates for the job. "
-        "Rank 1 is the best fit. Include every candidate id once and a one-line reason.\n\n"
-        f"{json.dumps(payload)}"
-    )
-    assessment = parse_with_claude(api_key, CompareAssessment, prompt)
-
-    expected_ids = [candidate.candidate_id for candidate in request.candidates]
-    rankings = validate_rankings(assessment.rankings, expected_ids)
-    model = get_claude_model()
-    logger.info("Compared %s candidates model=%s", len(rankings), model)
-    return CompareResponse(rankings=rankings, model=model)
-
-
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -474,14 +342,6 @@ def score(request: ScoreRequest) -> ScoreResponse:
     if api_key is None:
         return mock_score(request.candidate_id)
     return score_with_claude(request, api_key)
-
-
-@app.post("/compare", response_model=CompareResponse)
-def compare(request: CompareRequest) -> CompareResponse:
-    api_key = get_anthropic_api_key()
-    if api_key is None:
-        return mock_compare(request.candidates)
-    return compare_with_claude(request, api_key)
 
 
 if __name__ == "__main__":

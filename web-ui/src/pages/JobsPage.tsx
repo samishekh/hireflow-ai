@@ -40,7 +40,7 @@ export function JobsPage() {
         <h1>Post a real job. Watch every CV move.</h1>
         <p>
           Write the role the way you would send it to a candidate, then drop in the PDFs.
-          HireFlow parses, scores, and compares them while you watch.
+          HireFlow parses and scores them while you watch.
         </p>
         <Link to="/jobs/new" className="btn btn-ink">Create a role</Link>
       </section>

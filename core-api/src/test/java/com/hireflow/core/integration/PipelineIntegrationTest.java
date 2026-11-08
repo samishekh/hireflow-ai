@@ -22,7 +22,7 @@ import org.springframework.http.ResponseEntity;
 class PipelineIntegrationTest extends PipelineTestSupport {
 
     @Test
-    void singlePdfReachesDoneWithoutCompare() {
+    void singlePdfReachesDone() {
         String skill = "single-upload-skill";
         stubParseAndScore(skill, 80, 70, 60, 74.5);
 
@@ -37,19 +37,16 @@ class PipelineIntegrationTest extends PipelineTestSupport {
         assertThat(candidate.score().overallScore()).isEqualTo(74.5);
         assertThat(candidate.score().formulaVersion()).isEqualTo("v1");
         assertThat(candidate.score().model()).isEqualTo("mock");
-        assertThat(candidate.score().comparisonRank()).isNull();
         assertThat(requestCount("/parse-resume")).isEqualTo(1);
         assertThat(requestCount("/score")).isEqualTo(1);
-        assertThat(requestCount("/compare")).isZero();
     }
 
     @Test
-    void batchOfTwoIsComparedAndRankedByOverallScore() {
+    void batchOfTwoRanksByOverallScore() {
         String javaSkill = "batch-java-skill";
         String pythonSkill = "batch-python-skill";
         stubParseAndScore(javaSkill, 92, 88, 80, 90);
         stubParseAndScore(pythonSkill, 40, 50, 45, 55);
-        stubCompare();
 
         UUID jobId = createJob("Two resumes");
         List<UUID> ids = upload(
@@ -57,28 +54,24 @@ class PipelineIntegrationTest extends PipelineTestSupport {
                 pdf("python.pdf", pythonSkill),
                 pdf("java.pdf", javaSkill));
         assertThat(ids).hasSize(2);
+        UUID pythonId = ids.get(0);
+        UUID javaId = ids.get(1);
 
-        assertDone(awaitTerminal(ids.get(0)));
-        assertDone(awaitTerminal(ids.get(1)));
-        assertThat(requestCount("/compare")).isEqualTo(1);
+        assertDone(awaitTerminal(pythonId));
+        assertDone(awaitTerminal(javaId));
         assertThat(requestCount("/parse-resume")).isEqualTo(2);
         assertThat(requestCount("/score")).isEqualTo(2);
 
-        List<RankingResponse> ranked = rankings(jobId);
-        assertThat(ranked).extracting(RankingResponse::originalFilename).containsExactly("java.pdf", "python.pdf");
-        assertThat(ranked).extracting(row -> row.score().overallScore()).containsExactly(90.0, 55.0);
-        assertThat(ranked).extracting(row -> row.score().comparisonRank()).containsExactly(1, 2);
-        assertThat(ranked).allSatisfy(row -> {
-            assertThat(row.status()).isEqualTo(CandidateStatus.done);
-            assertThat(row.score().comparisonReason()).isEqualTo("relative fit");
-        });
+        List<RankingResponse> scored = rankings(jobId);
+        assertThat(scored).extracting(RankingResponse::originalFilename).containsExactly("java.pdf", "python.pdf");
+        assertThat(scored).extracting(row -> row.score().overallScore()).containsExactly(90.0, 55.0);
+        assertThat(scored).allSatisfy(row -> assertThat(row.status()).isEqualTo(CandidateStatus.done));
     }
 
     @Test
     void reuploadCopiesParseAndScoreWithoutCallingThemAgain() {
         String skill = "cache-reuse-skill";
         stubParseAndScore(skill, 80, 70, 60, 74.5);
-        stubCompare();
 
         UUID jobId = createJob("Cache reuse");
         byte[] bytes = pdf("first.pdf", skill).bytes();
@@ -114,7 +107,6 @@ class PipelineIntegrationTest extends PipelineTestSupport {
         assertThat(candidate.score()).isNull();
         assertThat(requestCount("/parse-resume")).isEqualTo(1);
         assertThat(requestCount("/score")).isZero();
-        assertThat(requestCount("/compare")).isZero();
     }
 
     @Test

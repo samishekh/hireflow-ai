@@ -28,7 +28,6 @@ import org.springframework.web.client.RestClientResponseException;
 class MatcherClientTest {
 
     private static final UUID CANDIDATE_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
-    private static final UUID OTHER_ID = UUID.fromString("22222222-2222-2222-2222-222222222222");
 
     private WireMockServer wireMock;
     private MatcherClient client;
@@ -77,47 +76,6 @@ class MatcherClientTest {
     }
 
     @Test
-    void comparePostsJsonAndBindsRankings() {
-        String json = """
-                {
-                  "rankings": [
-                    {
-                      "candidate_id": "22222222-2222-2222-2222-222222222222",
-                      "rank": 1,
-                      "reason": "stronger skills"
-                    },
-                    {
-                      "candidate_id": "11111111-1111-1111-1111-111111111111",
-                      "rank": 2,
-                      "reason": "less experience"
-                    }
-                  ],
-                  "model": "mock"
-                }
-                """;
-        wireMock.stubFor(post(urlEqualTo("/compare")).willReturn(okJson(json)));
-
-        CompareResponse response = client.compare(compareRequest());
-
-        String body = postedBody("/compare");
-        assertThat(body)
-                .doesNotContain("candidate_name")
-                .doesNotContain("email")
-                .doesNotContain("phone")
-                .contains("\"job_description\"")
-                .contains("\"candidate_id\"")
-                .contains("\"years_of_experience\"")
-                .contains("\"skills_score\"")
-                .contains("\"experience_score\"")
-                .contains("\"education_score\"")
-                .contains("\"field_of_study\"");
-        assertThat(response.model()).isEqualTo("mock");
-        assertThat(response.rankings()).containsExactly(
-                new ComparisonEntry(OTHER_ID, 1, "stronger skills"),
-                new ComparisonEntry(CANDIDATE_ID, 2, "less experience"));
-    }
-
-    @Test
     void missingFormulaVersionIsPermanent() {
         wireMock.stubFor(post(urlEqualTo("/score")).willReturn(okJson(scoreBody(false, true))));
 
@@ -138,44 +96,22 @@ class MatcherClientTest {
     }
 
     @Test
-    void emptyRankingsIsPermanent() {
-        wireMock.stubFor(post(urlEqualTo("/compare")).willReturn(okJson("""
-                {"rankings": null, "model": "mock"}
-                """)));
-
-        assertThatThrownBy(() -> client.compare(compareRequest()))
-                .isInstanceOf(PermanentException.class)
-                .hasMessage("Job matcher returned an empty comparison")
-                .hasNoCause();
-    }
-
-    @Test
     void clientErrorsArePermanent() {
         wireMock.stubFor(post(urlEqualTo("/score")).willReturn(aResponse().withStatus(400)));
-        wireMock.stubFor(post(urlEqualTo("/compare")).willReturn(aResponse().withStatus(429)));
 
         assertThatThrownBy(() -> client.score(scoreRequest()))
                 .isInstanceOf(PermanentException.class)
                 .hasMessage("HTTP 400 from job matcher")
-                .hasCauseInstanceOf(RestClientResponseException.class);
-        assertThatThrownBy(() -> client.compare(compareRequest()))
-                .isInstanceOf(PermanentException.class)
-                .hasMessage("HTTP 429 from job matcher")
                 .hasCauseInstanceOf(RestClientResponseException.class);
     }
 
     @Test
     void serverErrorsAreRetryable() {
         wireMock.stubFor(post(urlEqualTo("/score")).willReturn(aResponse().withStatus(503)));
-        wireMock.stubFor(post(urlEqualTo("/compare")).willReturn(aResponse().withStatus(500)));
 
         assertThatThrownBy(() -> client.score(scoreRequest()))
                 .isInstanceOf(RetryableException.class)
                 .hasMessage("HTTP 503 from job matcher")
-                .hasCauseInstanceOf(RestClientResponseException.class);
-        assertThatThrownBy(() -> client.compare(compareRequest()))
-                .isInstanceOf(RetryableException.class)
-                .hasMessage("HTTP 500 from job matcher")
                 .hasCauseInstanceOf(RestClientResponseException.class);
     }
 
@@ -184,10 +120,6 @@ class MatcherClientTest {
         wireMock.stop();
 
         assertThatThrownBy(() -> client.score(scoreRequest()))
-                .isInstanceOf(RetryableException.class)
-                .hasMessage("Could not reach job matcher")
-                .hasCauseInstanceOf(ResourceAccessException.class);
-        assertThatThrownBy(() -> client.compare(compareRequest()))
                 .isInstanceOf(RetryableException.class)
                 .hasMessage("Could not reach job matcher")
                 .hasCauseInstanceOf(ResourceAccessException.class);
@@ -203,30 +135,6 @@ class MatcherClientTest {
 
     private static ScoreRequest scoreRequest() {
         return new ScoreRequest(CANDIDATE_ID, "Backend engineer", blindCandidate());
-    }
-
-    private static CompareRequest compareRequest() {
-        CompareCandidate first = new CompareCandidate(
-                CANDIDATE_ID,
-                blindCandidate().skills(),
-                blindCandidate().yearsOfExperience(),
-                blindCandidate().workHistory(),
-                blindCandidate().education(),
-                80.0,
-                70.0,
-                60.0,
-                "solid backend fit");
-        CompareCandidate second = new CompareCandidate(
-                OTHER_ID,
-                List.of("Go"),
-                4.0,
-                List.of(new WorkExperience("Northwind", "Developer", "2021 - 2024", "Shipped services")),
-                List.of(new Education("City College", "B.A.", "Mathematics", "2014 - 2018")),
-                75.0,
-                65.0,
-                55.0,
-                "stronger skills");
-        return new CompareRequest("Backend engineer", List.of(first, second));
     }
 
     private static BlindCandidate blindCandidate() {

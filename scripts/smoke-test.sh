@@ -57,7 +57,7 @@ import sys
 rows = json.load(open(sys.argv[1]))
 if len(rows) != 2:
     sys.exit(1)
-if any(row["status"] in ("pending", "parsing", "scoring", "comparing") for row in rows):
+if any(row["status"] in ("pending", "parsing", "scoring") for row in rows):
     sys.exit(1)
 sys.exit(0)
 PY
@@ -80,7 +80,6 @@ import sys
 
 rows = json.load(open(sys.argv[1]))
 errors = []
-ranks = []
 if len(rows) != 2:
     errors.append(f"expected 2 candidates, got {len(rows)}")
 
@@ -90,7 +89,7 @@ for row in rows:
     score = row.get("score") or {}
     print(
         f"{name}  status={status}  overall={score.get('overall_score')}  "
-        f"rank={score.get('comparison_rank')}  model={score.get('model')}"
+        f"model={score.get('model')}"
     )
     if status != "done":
         errors.append(f"{name} status is {status}: {row.get('error_message')}")
@@ -107,16 +106,13 @@ for row in rows:
         errors.append(f"{name} formula_version is {score.get('formula_version')}")
     if score.get("model") != "mock":
         errors.append(f"{name} model is {score.get('model')}")
-    if score.get("comparison_reason") != "Mock comparison keeps the input order.":
-        errors.append(f"{name} comparison_reason is {score.get('comparison_reason')}")
-    ranks.append(score.get("comparison_rank"))
 
-if sorted(ranks) != [1, 2]:
-    errors.append(f"comparison ranks are {ranks}")
 if errors:
     print("\n".join(errors), file=sys.stderr)
     sys.exit(1)
 PY
+
+curl -fsS "$BASE/api/jobs/$job_id/rankings" >"$rankings_file"
 
 candidate_id="$(python3 - "$rankings_file" <<'PY'
 import json
@@ -172,7 +168,6 @@ import sys
 rows = json.load(open(sys.argv[1]))
 candidate_id = sys.argv[2]
 errors = []
-ranks = []
 target = None
 
 if len(rows) != 2:
@@ -188,7 +183,6 @@ for row in rows:
         errors.append(f"{name} has an unexpected override")
     if score.get("overall_score") != 67.0:
         errors.append(f"{name} overall_score is {score.get('overall_score')}")
-    ranks.append(score.get("comparison_rank"))
 
 if target is None:
     errors.append(f"rankings have no candidate {candidate_id}")
@@ -206,8 +200,6 @@ else:
     if override.get("decided_by") != "recruiter":
         errors.append(f"{name} override decided_by is {override.get('decided_by')}")
 
-if sorted(ranks) != [1, 2]:
-    errors.append(f"comparison ranks are {ranks}")
 if errors:
     print("\n".join(errors), file=sys.stderr)
     sys.exit(1)

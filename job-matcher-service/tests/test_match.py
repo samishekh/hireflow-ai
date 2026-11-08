@@ -1,4 +1,4 @@
-"""Score and compare paths with a stubbed Claude client. No API key required."""
+"""Score paths with a stubbed Claude client. No API key required."""
 
 import json
 
@@ -101,24 +101,6 @@ def _score_body(**overrides) -> dict:
     }
     body.update(overrides)
     return body
-
-
-def _compare_candidate(candidate_id: str, skills_score: float) -> dict:
-    return {
-        "candidate_id": candidate_id,
-        "skills_score": skills_score,
-        "experience_score": 60.0,
-        "education_score": 40.0,
-        "summary": "Summary for " + candidate_id,
-        **CANDIDATE,
-    }
-
-
-def _compare_body(count: int = 2) -> dict:
-    return {
-        "job_description": JOB,
-        "candidates": [_compare_candidate(f"cand-{index}", 80.0 - index) for index in range(1, count + 1)],
-    }
 
 
 def test_health(client: TestClient):
@@ -233,96 +215,4 @@ def test_missing_api_key_returns_mock_score(client: TestClient, monkeypatch: pyt
     assert body["formula_version"] == "v1"
     assert body["model"] == "mock"
     assert body["candidate_id"] == "cand-1"
-    assert _Anthropic.constructed == 0
-
-
-def test_compare_reorders_by_rank(client: TestClient, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    monkeypatch.delenv("CLAUDE_MODEL", raising=False)
-    _Anthropic.outcome = _parsed_response(
-        {
-            "rankings": [
-                {"candidate_id": "cand-1", "rank": 2, "reason": "Narrower stack."},
-                {"candidate_id": "cand-2", "rank": 1, "reason": "Closer skill match."},
-            ]
-        }
-    )
-
-    response = client.post("/compare", json=_compare_body())
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["model"] == main.DEFAULT_CLAUDE_MODEL
-    assert [row["candidate_id"] for row in body["rankings"]] == ["cand-2", "cand-1"]
-    assert [row["rank"] for row in body["rankings"]] == [1, 2]
-    call = _Anthropic.calls[0]
-    content = call["messages"][0]["content"]
-    assert '"candidate_name"' not in content
-    assert '"email"' not in content
-    assert '"phone"' not in content
-
-
-def test_compare_duplicate_ranks_return_502(client: TestClient, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    _Anthropic.outcome = _parsed_response(
-        {
-            "rankings": [
-                {"candidate_id": "cand-1", "rank": 1, "reason": "First."},
-                {"candidate_id": "cand-2", "rank": 1, "reason": "Also first."},
-            ]
-        }
-    )
-
-    response = client.post("/compare", json=_compare_body())
-
-    assert response.status_code == 502
-    assert response.json()["detail"] == "Comparison ranking did not match the candidates sent."
-
-
-def test_compare_unknown_id_returns_502(client: TestClient, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    _Anthropic.outcome = _parsed_response(
-        {
-            "rankings": [
-                {"candidate_id": "someone-else", "rank": 1, "reason": "Unknown."},
-                {"candidate_id": "cand-2", "rank": 2, "reason": "Known."},
-            ]
-        }
-    )
-
-    response = client.post("/compare", json=_compare_body())
-
-    assert response.status_code == 502
-    assert response.json()["detail"] == "Comparison ranking did not match the candidates sent."
-
-
-def test_compare_more_than_five_returns_422(client: TestClient):
-    response = client.post("/compare", json=_compare_body(6))
-
-    assert response.status_code == 422
-
-
-def test_compare_empty_list_returns_422(client: TestClient):
-    response = client.post("/compare", json={"job_description": JOB, "candidates": []})
-
-    assert response.status_code == 422
-
-
-def test_compare_single_candidate_returns_422(client: TestClient):
-    response = client.post("/compare", json=_compare_body(1))
-
-    assert response.status_code == 422
-
-
-def test_missing_api_key_compare_keeps_input_order(client: TestClient, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-
-    response = client.post("/compare", json=_compare_body())
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["model"] == "mock"
-    assert [row["candidate_id"] for row in body["rankings"]] == ["cand-1", "cand-2"]
-    assert [row["rank"] for row in body["rankings"]] == [1, 2]
-    assert body["rankings"][0]["reason"] == main.MOCK_COMPARE_REASON
     assert _Anthropic.constructed == 0

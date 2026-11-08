@@ -4,7 +4,6 @@ export const PHASES: { id: CandidateStatus; label: string }[] = [
   { id: 'pending', label: 'Pending' },
   { id: 'parsing', label: 'Parsing' },
   { id: 'scoring', label: 'Scoring' },
-  { id: 'comparing', label: 'Comparing' },
   { id: 'done', label: 'Done' },
 ]
 
@@ -12,11 +11,10 @@ export const PHASE_INDEX: Record<string, number> = {
   pending: 0,
   parsing: 1,
   scoring: 2,
-  comparing: 3,
-  done: 4,
+  done: 3,
 }
 
-export const IN_FLIGHT = new Set<CandidateStatus>(['pending', 'parsing', 'scoring', 'comparing'])
+export const IN_FLIGHT = new Set<CandidateStatus>(['pending', 'parsing', 'scoring'])
 
 export function scoreText(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return '—'

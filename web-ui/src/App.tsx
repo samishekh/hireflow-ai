@@ -1,7 +1,6 @@
 import { BrowserRouter, Link, Route, Routes } from 'react-router-dom'
 import { Shell } from './components/Shell'
 import { CandidatePage } from './pages/CandidatePage'
-import { ComparePage } from './pages/ComparePage'
 import { JobLayout } from './pages/JobLayout'
 import { JobsPage } from './pages/JobsPage'
 import { NewJobPage } from './pages/NewJobPage'
@@ -18,7 +17,6 @@ export function App() {
           <Route path="jobs/:jobId" element={<JobLayout />}>
             <Route index element={<PipelinePage />} />
             <Route path="rankings" element={<RankingsPage />} />
-            <Route path="compare" element={<ComparePage />} />
             <Route path="candidates/:candidateId" element={<CandidatePage />} />
           </Route>
           <Route path="*" element={<NotFound />} />

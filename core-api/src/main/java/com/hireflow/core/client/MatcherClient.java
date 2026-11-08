@@ -34,22 +34,4 @@ public class MatcherClient {
             throw new RetryableException("Could not reach job matcher", exception);
         }
     }
-
-    public CompareResponse compare(CompareRequest request) {
-        try {
-            CompareResponse response = restClient.post()
-                    .uri("/compare")
-                    .body(request)
-                    .retrieve()
-                    .body(CompareResponse.class);
-            if (response == null || response.rankings() == null) {
-                throw new PermanentException("Job matcher returned an empty comparison");
-            }
-            return response;
-        } catch (RestClientResponseException exception) {
-            throw ClientSupport.map("job matcher", exception);
-        } catch (ResourceAccessException exception) {
-            throw new RetryableException("Could not reach job matcher", exception);
-        }
-    }
 }

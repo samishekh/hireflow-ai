@@ -8,6 +8,7 @@ import com.hireflow.core.client.ScoreResponse;
 import com.hireflow.core.domain.BlindCandidate;
 import com.hireflow.core.domain.ParsedResume;
 import com.hireflow.core.persistence.MatchResultEntity;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,7 +27,6 @@ public class PipelineService {
     private final MatcherClient matcher;
     private final RemoteCall remoteCall;
     private final CacheKeyFactory cacheKeys;
-    private final BatchTracker batches;
     private final ConcurrentHashMap<String, Object> scoreLocks = new ConcurrentHashMap<>();
 
     public PipelineService(
@@ -34,25 +34,21 @@ public class PipelineService {
             ParserClient parser,
             MatcherClient matcher,
             RemoteCall remoteCall,
-            CacheKeyFactory cacheKeys,
-            BatchTracker batches) {
+            CacheKeyFactory cacheKeys) {
         this.store = store;
         this.parser = parser;
         this.matcher = matcher;
         this.remoteCall = remoteCall;
         this.cacheKeys = cacheKeys;
-        this.batches = batches;
     }
 
     @Async("taskExecutor")
-    public void processCandidate(UUID candidateId, String filename, byte[] pdf, UploadBatch batch) {
+    public void processCandidate(UUID candidateId, String filename, byte[] pdf) {
         try {
             parseAndScore(candidateId, filename, pdf);
         } catch (Throwable exception) {
             logger.warn("Candidate {} failed: {}", candidateId, exception.getMessage());
             store.markFailed(candidateId, exception.getMessage());
-        } finally {
-            batches.finished(batch, candidateId);
         }
     }
 
@@ -84,6 +80,7 @@ public class PipelineService {
             if (cachedScore.isPresent()) {
                 logger.info("Reusing score for candidate {}", candidateId);
                 store.copyScore(candidateId, cachedScore.get().getCandidateId(), cacheKey);
+                store.markDone(List.of(candidateId));
                 return;
             }
 
@@ -92,6 +89,7 @@ public class PipelineService {
                 return matcher.score(new ScoreRequest(candidateId, context.normalizedDescription(), blind));
             });
             store.saveScore(candidateId, score, cacheKey);
+            store.markDone(List.of(candidateId));
         }
     }
 }

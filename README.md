@@ -7,9 +7,9 @@ A recruiter creates a job, uploads CV PDFs, and gets a ranked shortlist with rea
 | Piece | Role | Status |
 | --- | --- | --- |
 | `resume-parser-service` | Python FastAPI. PDF to structured candidate data. Port 8000. | Built |
-| `job-matcher-service` | Python FastAPI. Scores a parsed CV, then compares the top candidates. Port 8001. | Built |
+| `job-matcher-service` | Python FastAPI. Scores a parsed CV against a job. Port 8001. | Built |
 | `core-api` | Java Spring Boot. Jobs, uploads, orchestration, PostgreSQL. Port 8080. | Built |
-| `web-ui` | React + Vite. Create a job, upload CVs, watch the pipeline, read rankings and the comparison, record an override. Port 5173. | Built |
+| `web-ui` | React + Vite. Create a job, upload CVs, watch the pipeline, read rankings, record an override. Port 5173. | Built |
 
 ## Run
 
@@ -29,7 +29,7 @@ Compose starts Postgres, the parser, the matcher, `core-api`, and the web UI. St
 | Health | [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health) |
 | Web UI | [http://localhost:5173](http://localhost:5173) |
 
-The UI is served by nginx in Compose and calls `core-api` on the same origin. A role is a full posting: overview, responsibilities, requirements, and nice-to-haves. The pipeline page polls rankings and slides each CV across Pending, Parsing, Scoring, Comparing, and Done. Compare is a separate page for the top-five reasons. Rankings keep the weighted score next to any recruiter decision.
+The UI is served by nginx in Compose and calls `core-api` on the same origin. A role is a full posting: overview, responsibilities, requirements, and nice-to-haves. The pipeline page polls rankings and slides each CV across Pending, Parsing, Scoring, and Done. Rankings keep the weighted score next to any recruiter decision.
 
 To work on the UI without rebuilding the image, with `core-api` already on port 8080:
 
@@ -43,7 +43,7 @@ The dev server proxies `/api` to `http://localhost:8080`.
 
 ### Claude or mock
 
-Both Python services call Claude when `ANTHROPIC_API_KEY` is set. With no key they stay in mock mode: the parser returns a fixed resume, `/score` returns sub-scores 80, 60, and 40 (`overall_score` 67.0), and `/compare` keeps the input order.
+Both Python services call Claude when `ANTHROPIC_API_KEY` is set. With no key they stay in mock mode: the parser returns a fixed resume, and `/score` returns sub-scores 80, 60, and 40 (`overall_score` 67.0).
 
 Put the same file in `resume-parser-service/.env` and `job-matcher-service/.env`. Both are gitignored, and Compose treats a missing file as mock mode. `.dockerignore` keeps `.env` out of images. Recreate the containers after you change either file.
 
@@ -62,7 +62,7 @@ With the stack up and both services in mock mode:
 ./scripts/smoke-test.sh
 ```
 
-The script creates a job, uploads `scripts/fixtures/one.pdf` and `scripts/fixtures/two.pdf`, and expects both candidates to finish at `overall_score` 67.0 with model `mock`. It then records an accepted override and checks that the decision is stored while the score and ranks stay the same. A real API key fails those fixed scores.
+The script creates a job, uploads `scripts/fixtures/one.pdf` and `scripts/fixtures/two.pdf`, and expects both candidates to finish at `overall_score` 67.0 with model `mock`. It then records an accepted override and checks that the decision is stored while the score stays the same. A real API key fails those fixed scores.
 
 ## CI
 
@@ -86,12 +86,11 @@ Two placeholders have to be replaced before applying. In `k8s/configmap.yaml`, s
 
 ## Pipeline
 
-`core-api` runs each upload through parse, score, and compare. Name, email, and phone stay in PostgreSQL. The matcher receives the normalized job description and a blind profile only. `overall_score` and `formula_version` are stored as the matcher returns them. A second identical blind profile reuses the stored score.
+`core-api` runs each upload through parse and score. Name, email, and phone stay in PostgreSQL. The matcher receives the normalized job description and a blind profile only. `overall_score` and `formula_version` are stored as the matcher returns them. A second identical blind profile reuses the stored score.
 
 1. **Parse.** Extract PDF text and return name, contact, skills, years of experience, work history, and education. PDF only, under 10MB. `POST /parse-resume`.
-2. **Score.** Blind profile: skills, work history, education, and years of experience. Claude returns skills, experience, and education sub-scores plus evidence. `overall_score` is `0.50 * skills + 0.35 * experience + 0.15 * education`, rounded to one decimal. Formula label: `v1`. `POST /score`.
-3. **Compare.** Rank 2 to 5 already-scored candidates. Rank 1 is the best fit. `POST /compare`.
-4. **Override.** Accepted only after status `done`. It does not change the model score.
+2. **Score.** Blind profile: skills, work history, education, and years of experience. Claude returns skills, experience, and education sub-scores plus evidence. `overall_score` is `0.50 * skills + 0.35 * experience + 0.15 * education`, rounded to one decimal. Formula label: `v1`. `POST /score`. Scoring ends at status `done`.
+3. **Override.** Accepted only after status `done`. It does not change the model score.
 
 `POST /api/jobs/{id}/candidates` returns 202. Poll rankings until status is `done` or `failed`.
 
@@ -111,7 +110,7 @@ curl -s -X POST http://localhost:8080/api/candidates/{candidateId}/override \
   -d '{"decision":"accepted","note":"Matches the role","decided_by":"recruiter"}'
 ```
 
-Request bodies for `/parse-resume`, `/score`, and `/compare` are in the service docs linked above.
+Request bodies for `/parse-resume` and `/score` are in the service docs linked above.
 
 ## Run without Compose
 

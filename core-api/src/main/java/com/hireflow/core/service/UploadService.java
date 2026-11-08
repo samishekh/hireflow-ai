@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -37,10 +36,9 @@ public class UploadService {
             uploads.add(read(file));
         }
         List<UUID> ids = store.insertPending(jobId, uploads);
-        UploadBatch batch = new UploadBatch(jobId, new LinkedHashSet<>(ids));
         for (int index = 0; index < ids.size(); index++) {
             PendingUpload upload = uploads.get(index);
-            pipeline.processCandidate(ids.get(index), upload.filename(), upload.bytes(), batch);
+            pipeline.processCandidate(ids.get(index), upload.filename(), upload.bytes());
         }
         return ids;
     }

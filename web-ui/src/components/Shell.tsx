@@ -35,9 +35,6 @@ export function Subnav({ jobId, count }: { jobId: string; count: number | null }
       <NavLink to={`/jobs/${jobId}/rankings`} className={({ isActive }) => (isActive ? 'tab on' : 'tab')}>
         Rankings
       </NavLink>
-      <NavLink to={`/jobs/${jobId}/compare`} className={({ isActive }) => (isActive ? 'tab on' : 'tab')}>
-        Compare
-      </NavLink>
     </nav>
   )
 }
