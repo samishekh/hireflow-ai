@@ -72,6 +72,18 @@ GitHub Actions runs on every pull request and on every push to `master`. Pytest 
 
 A push to `master` publishes the four images to GHCR as `ghcr.io/<owner>/hireflow-ai/<service>:latest` and a tag for the commit. The workflow uses `GITHUB_TOKEN`. No Claude key is stored in Actions.
 
+## Kubernetes
+
+Local runs stay on Compose. `k8s/` is the same app for Amazon EKS. The cluster is not created yet.
+
+The manifests are a namespace, a ConfigMap, one Deployment and ClusterIP Service per app, and an Ingress in front of the UI. Probes match the Compose healthchecks. `web-ui` waits until `core-api` health reports UP. Postgres is not in the cluster. `core-api` reads `SPRING_DATASOURCE_URL` from the ConfigMap, and that value has to be the RDS endpoint. The parser and matcher stay on cluster DNS: `http://resume-parser-service:8000` and `http://job-matcher-service:8001`.
+
+Images are `ghcr.io/samishekh/hireflow-ai/<service>:latest` with `imagePullPolicy: Always`. Each Deployment expects a docker-registry Secret named `ghcr` in the `hireflow` namespace. `k8s/secret.example.yaml` shows the app Secret (`POSTGRES_PASSWORD`, `ANTHROPIC_API_KEY`, `CLAUDE_MODEL`) and is not applied by kustomize. An empty `ANTHROPIC_API_KEY` keeps both Python services in mock mode. An empty `CLAUDE_MODEL` leaves each service on `claude-sonnet-5-5`.
+
+The Ingress class is `alb`, for the AWS Load Balancer Controller. It redirects HTTP to HTTPS, health-checks `/`, and sets the load balancer idle timeout to 180 seconds so a parse or score request is not cut off. The UI nginx already allows a 100 MB body and proxies `/api` and `/actuator` to `core-api`.
+
+Two placeholders have to be replaced before applying. In `k8s/configmap.yaml`, set `SPRING_DATASOURCE_URL` to the RDS endpoint. The database user there is `postgres`. In `k8s/ingress.yaml`, set `hireflow.example.com` and the ACM certificate ARN. The certificate has to be in the same region as the cluster.
+
 ## Pipeline
 
 `core-api` runs each upload through parse, score, and compare. Name, email, and phone stay in PostgreSQL. The matcher receives the normalized job description and a blind profile only. `overall_score` and `formula_version` are stored as the matcher returns them. A second identical blind profile reuses the stored score.

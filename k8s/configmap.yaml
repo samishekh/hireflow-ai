@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hireflow
+  namespace: hireflow
+  labels:
+    app.kubernetes.io/part-of: hireflow
+data:
+  # Replace the host with the RDS endpoint before applying. RDS stays private.
+  SPRING_DATASOURCE_URL: jdbc:postgresql://REPLACE_ME.rds.amazonaws.com:5432/hireflow
+  SPRING_DATASOURCE_USERNAME: postgres
+  HIREFLOW_PARSER_BASE_URL: http://resume-parser-service:8000
+  HIREFLOW_MATCHER_BASE_URL: http://job-matcher-service:8001
