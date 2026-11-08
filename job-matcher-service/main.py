@@ -7,7 +7,7 @@ import logging
 import os
 from copy import deepcopy
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Any
+from typing import Any, TypeVar
 
 from anthropic import Anthropic, APIError, APIStatusError
 from dotenv import load_dotenv
@@ -21,6 +21,8 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
 logger = logging.getLogger("job-matcher-service")
+
+T = TypeVar("T", bound=BaseModel)
 
 DEFAULT_CLAUDE_MODEL = "claude-sonnet-5-5"
 SCORE_TOOL = "score_candidate"
@@ -293,36 +295,42 @@ def _provider_error(exc: Exception) -> HTTPException:
     return HTTPException(status_code=500, detail="Unexpected error while matching.")
 
 
-def call_tool(api_key: str, tool_name: str, tool_schema: dict[str, Any], user_content: str) -> dict[str, Any]:
+def parse_with_claude(api_key: str, output_model: type[T], user_content: str) -> T:
     model = get_claude_model()
     client = Anthropic(api_key=api_key)
-    logger.info("Calling Claude model %s tool %s", model, tool_name)
+    logger.info("Calling Claude model %s for %s", model, output_model.__name__)
 
     try:
-        response = client.messages.create(
+        response = client.messages.parse(
             model=model,
             max_tokens=4096,
-            temperature=0,
-            tools=[tool_schema],
-            tool_choice={"type": "tool", "name": tool_name},
+            output_format=output_model,
             messages=[{"role": "user", "content": user_content}],
         )
+    except ValidationError as exc:
+        logger.error("Claude %s payload failed validation: %s", output_model.__name__, exc)
+        raise HTTPException(
+            status_code=502,
+            detail="Matcher returned data that did not match the expected schema.",
+        ) from exc
     except (APIStatusError, APIError) as exc:
         raise _provider_error(exc) from exc
     except Exception as exc:
         raise _provider_error(exc) from exc
 
-    tool_input: dict[str, Any] | None = None
-    for block in response.content:
-        if getattr(block, "type", None) == "tool_use" and getattr(block, "name", None) == tool_name:
-            tool_input = dict(block.input)
-            break
-
-    if tool_input is None:
-        logger.error("Claude response did not include %s tool use: %s", tool_name, response.content)
+    parsed_output = getattr(response, "parsed_output", None)
+    if parsed_output is None:
+        logger.error("Claude response did not include %s data: %s", output_model.__name__, response)
         raise HTTPException(status_code=502, detail="Matcher did not return structured data.")
 
-    return tool_input
+    try:
+        return output_model.model_validate(parsed_output)
+    except ValidationError as exc:
+        logger.error("Claude %s payload failed validation: %s", output_model.__name__, exc)
+        raise HTTPException(
+            status_code=502,
+            detail="Matcher returned data that did not match the expected schema.",
+        ) from exc
 
 
 def _score_from_assessment(candidate_id: str, assessment: ScoreAssessment, model: str) -> ScoreResponse:
@@ -397,19 +405,11 @@ def score_with_claude(request: ScoreRequest, api_key: str) -> ScoreResponse:
         "candidate": request.candidate.model_dump(),
     }
     prompt = (
-        "Score this candidate against the job. Call the score_candidate tool with sub-scores and evidence. "
+        "Score this candidate against the job. Return sub-scores and evidence. "
         "Do not invent an overall score.\n\n"
         f"{json.dumps(body)}"
     )
-    tool_input = call_tool(api_key, SCORE_TOOL, SCORE_TOOL_SCHEMA, prompt)
-    try:
-        assessment = ScoreAssessment.model_validate(tool_input)
-    except ValidationError as exc:
-        logger.error("Claude score payload failed validation: %s", exc)
-        raise HTTPException(
-            status_code=502,
-            detail="Matcher returned data that did not match the expected schema.",
-        ) from exc
+    assessment = parse_with_claude(api_key, ScoreAssessment, prompt)
 
     model = get_claude_model()
     logger.info("Scored candidate_id=%s model=%s", request.candidate_id, model)
@@ -447,19 +447,11 @@ def compare_with_claude(request: CompareRequest, api_key: str) -> CompareRespons
         "candidates": [candidate.model_dump() for candidate in request.candidates],
     }
     prompt = (
-        "Rank these candidates for the job. Call the compare_candidates tool. "
+        "Rank these candidates for the job. "
         "Rank 1 is the best fit. Include every candidate id once and a one-line reason.\n\n"
         f"{json.dumps(payload)}"
     )
-    tool_input = call_tool(api_key, COMPARE_TOOL, COMPARE_TOOL_SCHEMA, prompt)
-    try:
-        assessment = CompareAssessment.model_validate(tool_input)
-    except ValidationError as exc:
-        logger.error("Claude comparison payload failed validation: %s", exc)
-        raise HTTPException(
-            status_code=502,
-            detail="Matcher returned data that did not match the expected schema.",
-        ) from exc
+    assessment = parse_with_claude(api_key, CompareAssessment, prompt)
 
     expected_ids = [candidate.candidate_id for candidate in request.candidates]
     rankings = validate_rankings(assessment.rankings, expected_ids)

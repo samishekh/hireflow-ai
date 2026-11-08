@@ -204,22 +204,26 @@ def parse_resume_with_claude(raw_text: str, api_key: str) -> ResumeParsedData:
     logger.info("Calling Claude model %s to parse resume", model)
 
     try:
-        response = client.messages.create(
+        response = client.messages.parse(
             model=model,
             max_tokens=4096,
-            tools=[PARSE_RESUME_TOOL_SCHEMA],
-            tool_choice={"type": "tool", "name": PARSE_RESUME_TOOL},
+            output_format=ResumeParsedData,
             messages=[
                 {
                     "role": "user",
                     "content": (
-                        "Parse the following resume text into structured candidate data. "
-                        "Call the parse_resume tool with the extracted fields.\n\n"
+                        "Parse the following resume text into structured candidate data.\n\n"
                         f"{raw_text}"
                     ),
                 }
             ],
         )
+    except ValidationError as exc:
+        logger.error("Claude resume payload failed validation: %s", exc)
+        raise HTTPException(
+            status_code=502,
+            detail="Parser returned data that did not match the expected schema.",
+        ) from exc
     except APIStatusError as exc:
         logger.exception("Anthropic API returned an error status: %s", exc.status_code)
         raise HTTPException(
@@ -236,20 +240,15 @@ def parse_resume_with_claude(raw_text: str, api_key: str) -> ResumeParsedData:
         logger.exception("Unexpected error while calling Claude")
         raise HTTPException(status_code=500, detail="Unexpected error while parsing resume.") from exc
 
-    tool_input: dict[str, Any] | None = None
-    for block in response.content:
-        if getattr(block, "type", None) == "tool_use" and getattr(block, "name", None) == PARSE_RESUME_TOOL:
-            tool_input = dict(block.input)
-            break
-
-    if tool_input is None:
-        logger.error("Claude response did not include parse_resume tool use: %s", response.content)
+    parsed_output = getattr(response, "parsed_output", None)
+    if parsed_output is None:
+        logger.error("Claude response did not include structured resume data: %s", response)
         raise HTTPException(status_code=502, detail="Parser did not return structured resume data.")
 
     try:
-        parsed = ResumeParsedData.model_validate(tool_input)
+        parsed = ResumeParsedData.model_validate(parsed_output)
     except ValidationError as exc:
-        logger.error("Claude tool payload failed validation: %s", exc)
+        logger.error("Claude resume payload failed validation: %s", exc)
         raise HTTPException(
             status_code=502,
             detail="Parser returned data that did not match the expected schema.",

@@ -42,8 +42,9 @@ class _Block:
 
 
 class _Response:
-    def __init__(self, content: list):
-        self.content = content
+    def __init__(self, content: list | None = None, parsed_output: object = None):
+        self.content = content or []
+        self.parsed_output = parsed_output
 
 
 class _Anthropic:
@@ -56,7 +57,7 @@ class _Anthropic:
         self.messages = self
         self.calls: list[dict] = []
 
-    def create(self, **kwargs):
+    def parse(self, **kwargs):
         self.calls.append(kwargs)
         outcome = type(self).outcome
         if isinstance(outcome, BaseException):
@@ -68,8 +69,8 @@ def _request() -> httpx2.Request:
     return httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
 
 
-def _tool_response(payload: dict, name: str = main.PARSE_RESUME_TOOL) -> _Response:
-    return _Response([_Block("tool_use", name=name, payload=payload)])
+def _parsed_response(payload: dict) -> _Response:
+    return _Response(parsed_output=payload)
 
 
 @pytest.fixture
@@ -77,7 +78,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(main, "extract_text_from_pdf", lambda pdf_bytes: RAW_TEXT)
     monkeypatch.setattr(main, "Anthropic", _Anthropic)
     _Anthropic.constructed = 0
-    _Anthropic.outcome = _tool_response(VALID_PARSED)
+    _Anthropic.outcome = _parsed_response(VALID_PARSED)
     return TestClient(main.app)
 
 
@@ -88,7 +89,7 @@ def _upload(client: TestClient):
     )
 
 
-def test_tool_payload_becomes_parsed_data(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+def test_structured_payload_becomes_parsed_data(client: TestClient, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
 
     response = _upload(client)
@@ -100,7 +101,7 @@ def test_tool_payload_becomes_parsed_data(client: TestClient, monkeypatch: pytes
     assert _Anthropic.constructed == 1
 
 
-def test_missing_tool_call_returns_502(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+def test_missing_structured_output_returns_502(client: TestClient, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     _Anthropic.outcome = _Response([_Block("text")])
 
@@ -110,9 +111,9 @@ def test_missing_tool_call_returns_502(client: TestClient, monkeypatch: pytest.M
     assert response.json()["detail"] == "Parser did not return structured resume data."
 
 
-def test_invalid_tool_payload_returns_502(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+def test_invalid_payload_returns_502(client: TestClient, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    _Anthropic.outcome = _tool_response({**VALID_PARSED, "nickname": "Ada"})
+    _Anthropic.outcome = _parsed_response({**VALID_PARSED, "nickname": "Ada"})
 
     response = _upload(client)
 

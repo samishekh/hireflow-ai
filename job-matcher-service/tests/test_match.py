@@ -52,8 +52,9 @@ class _Block:
 
 
 class _Response:
-    def __init__(self, content: list):
-        self.content = content
+    def __init__(self, content: list | None = None, parsed_output: object = None):
+        self.content = content or []
+        self.parsed_output = parsed_output
 
 
 class _Anthropic:
@@ -66,7 +67,7 @@ class _Anthropic:
         self.api_key = api_key
         self.messages = self
 
-    def create(self, **kwargs):
+    def parse(self, **kwargs):
         type(self).calls.append(kwargs)
         outcome = type(self).outcome
         if isinstance(outcome, BaseException):
@@ -78,8 +79,8 @@ def _request() -> httpx2.Request:
     return httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
 
 
-def _tool_response(payload: dict, name: str) -> _Response:
-    return _Response([_Block("tool_use", name=name, payload=payload)])
+def _parsed_response(payload: dict) -> _Response:
+    return _Response(parsed_output=payload)
 
 
 @pytest.fixture
@@ -88,7 +89,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(main, "Anthropic", _Anthropic)
     _Anthropic.constructed = 0
     _Anthropic.calls = []
-    _Anthropic.outcome = _tool_response(ASSESSMENT, main.SCORE_TOOL)
+    _Anthropic.outcome = _parsed_response(ASSESSMENT)
     return TestClient(main.app)
 
 
@@ -133,7 +134,7 @@ def test_weighted_overall_score_uses_v1_weights():
     assert main.weighted_overall_score(90, 70, 40) == 75.5
 
 
-def test_tool_payload_becomes_score(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+def test_structured_payload_becomes_score(client: TestClient, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     monkeypatch.delenv("CLAUDE_MODEL", raising=False)
 
@@ -151,9 +152,8 @@ def test_tool_payload_becomes_score(client: TestClient, monkeypatch: pytest.Monk
     assert body["summary"] == ASSESSMENT["summary"]
     assert _Anthropic.constructed == 1
     call = _Anthropic.calls[0]
-    assert call["temperature"] == 0
     assert call["model"] == main.DEFAULT_CLAUDE_MODEL
-    assert call["tool_choice"] == {"type": "tool", "name": main.SCORE_TOOL}
+    assert call["output_format"] is main.ScoreAssessment
     content = call["messages"][0]["content"]
     assert '"candidate_name"' not in content
     assert '"email"' not in content
@@ -164,7 +164,7 @@ def test_tool_payload_becomes_score(client: TestClient, monkeypatch: pytest.Monk
 
 def test_overall_score_from_claude_returns_502(client: TestClient, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    _Anthropic.outcome = _tool_response({**ASSESSMENT, "overall_score": 99}, main.SCORE_TOOL)
+    _Anthropic.outcome = _parsed_response({**ASSESSMENT, "overall_score": 99})
 
     response = client.post("/score", json=_score_body())
 
@@ -185,7 +185,7 @@ def test_blank_job_description_returns_422(client: TestClient):
     assert response.status_code == 422
 
 
-def test_missing_tool_call_returns_502(client: TestClient, monkeypatch: pytest.MonkeyPatch):
+def test_missing_structured_output_returns_502(client: TestClient, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     _Anthropic.outcome = _Response([_Block("text")])
 
@@ -239,14 +239,13 @@ def test_missing_api_key_returns_mock_score(client: TestClient, monkeypatch: pyt
 def test_compare_reorders_by_rank(client: TestClient, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     monkeypatch.delenv("CLAUDE_MODEL", raising=False)
-    _Anthropic.outcome = _tool_response(
+    _Anthropic.outcome = _parsed_response(
         {
             "rankings": [
                 {"candidate_id": "cand-1", "rank": 2, "reason": "Narrower stack."},
                 {"candidate_id": "cand-2", "rank": 1, "reason": "Closer skill match."},
             ]
-        },
-        main.COMPARE_TOOL,
+        }
     )
 
     response = client.post("/compare", json=_compare_body())
@@ -257,7 +256,6 @@ def test_compare_reorders_by_rank(client: TestClient, monkeypatch: pytest.Monkey
     assert [row["candidate_id"] for row in body["rankings"]] == ["cand-2", "cand-1"]
     assert [row["rank"] for row in body["rankings"]] == [1, 2]
     call = _Anthropic.calls[0]
-    assert call["temperature"] == 0
     content = call["messages"][0]["content"]
     assert '"candidate_name"' not in content
     assert '"email"' not in content
@@ -266,14 +264,13 @@ def test_compare_reorders_by_rank(client: TestClient, monkeypatch: pytest.Monkey
 
 def test_compare_duplicate_ranks_return_502(client: TestClient, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    _Anthropic.outcome = _tool_response(
+    _Anthropic.outcome = _parsed_response(
         {
             "rankings": [
                 {"candidate_id": "cand-1", "rank": 1, "reason": "First."},
                 {"candidate_id": "cand-2", "rank": 1, "reason": "Also first."},
             ]
-        },
-        main.COMPARE_TOOL,
+        }
     )
 
     response = client.post("/compare", json=_compare_body())
@@ -284,14 +281,13 @@ def test_compare_duplicate_ranks_return_502(client: TestClient, monkeypatch: pyt
 
 def test_compare_unknown_id_returns_502(client: TestClient, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    _Anthropic.outcome = _tool_response(
+    _Anthropic.outcome = _parsed_response(
         {
             "rankings": [
                 {"candidate_id": "someone-else", "rank": 1, "reason": "Unknown."},
                 {"candidate_id": "cand-2", "rank": 2, "reason": "Known."},
             ]
-        },
-        main.COMPARE_TOOL,
+        }
     )
 
     response = client.post("/compare", json=_compare_body())
