@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link, Outlet, useParams } from 'react-router-dom'
+import { Link, Outlet, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api'
+import { ConfirmDelete } from '../components/ConfirmDelete'
 import { Subnav } from '../components/Shell'
 import { IN_FLIGHT } from '../format'
 import { LiveProvider, useLive } from '../live'
@@ -65,6 +66,7 @@ function JobScreen({ jobId }: { jobId: string }) {
 }
 
 function JobFrame({ job }: { job: Job }) {
+  const navigate = useNavigate()
   const { rows, error } = useLive()
   const inFlight = rows?.some((row) => IN_FLIGHT.has(row.status)) ?? false
   useEffect(() => {
@@ -77,9 +79,21 @@ function JobFrame({ job }: { job: Job }) {
           <p className="kicker">Role</p>
           <h1>{job.title}</h1>
         </div>
-        {inFlight ? (
-          <span className="pill pill-live"><span className="live-dot" aria-hidden="true" /> Live</span>
-        ) : null}
+        <div className="role-actions">
+          {inFlight ? (
+            <span className="pill pill-live"><span className="live-dot" aria-hidden="true" /> Live</span>
+          ) : null}
+          <ConfirmDelete
+            idle="Delete role"
+            prompt="Delete this role and every candidate?"
+            pending="Deleting…"
+            success={`${job.title} was deleted.`}
+            onDelete={async () => {
+              await api.deleteJob(job.id)
+              navigate('/')
+            }}
+          />
+        </div>
       </header>
       <Subnav jobId={job.id} count={rows ? rows.length : null} />
       {error ? <div className="banner" role="alert">{error} Retrying.</div> : null}

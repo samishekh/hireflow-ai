@@ -187,6 +187,14 @@ abstract class PipelineTestSupport {
         return rest.exchange("/api/formula", HttpMethod.PUT, new HttpEntity<>(body, headers), String.class);
     }
 
+    ResponseEntity<String> get(String path, Object... uriVariables) {
+        return rest.getForEntity(path, String.class, uriVariables);
+    }
+
+    ResponseEntity<String> delete(String path, Object... uriVariables) {
+        return rest.exchange(path, HttpMethod.DELETE, HttpEntity.EMPTY, String.class, uriVariables);
+    }
+
     List<RankingResponse> rankings(UUID jobId) {
         ResponseEntity<String> response = rest.getForEntity("/api/jobs/{id}/rankings", String.class, jobId);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);

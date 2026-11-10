@@ -1,6 +1,7 @@
 import { useEffect, useState, type SubmitEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api, ApiError } from '../api'
+import { ConfirmDelete } from '../components/ConfirmDelete'
 import { ScoreDetails } from '../components/ScoreCard'
 import { decisionLabel, formatWhen, statusLabel, yearsLabel } from '../format'
 import { useLive } from '../live'
@@ -15,14 +16,17 @@ export function CandidatePage() {
 
 function CandidateScreen({ jobId, candidateId }: { jobId: string; candidateId: string }) {
   const toast = useToast()
+  const navigate = useNavigate()
   const { rows, refresh } = useLive()
   const [candidate, setCandidate] = useState<Candidate | null>(null)
+  const [leaving, setLeaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState<Override | null>(null)
   const liveOverride = rows?.find((row) => row.id === candidateId)?.override ?? null
   const override = newer(saved, liveOverride)
 
   useEffect(() => {
+    if (leaving) return
     let cancel = false
     let timer = 0
     let announced = false
@@ -52,7 +56,7 @@ function CandidateScreen({ jobId, candidateId }: { jobId: string; candidateId: s
       cancel = true
       window.clearTimeout(timer)
     }
-  }, [candidateId, toast])
+  }, [candidateId, leaving, toast])
 
   if (error && !candidate) {
     return (
@@ -74,7 +78,25 @@ function CandidateScreen({ jobId, candidateId }: { jobId: string; candidateId: s
           <h1>{parsed?.candidate_name?.trim() || candidate.original_filename}</h1>
           <p className="lede">{parsed ? yearsLabel(parsed.years_of_experience) : 'The CV is still being read.'}</p>
         </div>
-        <span className={candidate.status === 'failed' ? 'pill pill-bad' : 'pill'}>{statusLabel(candidate.status)}</span>
+        <div className="role-actions">
+          <span className={candidate.status === 'failed' ? 'pill pill-bad' : 'pill'}>{statusLabel(candidate.status)}</span>
+          <ConfirmDelete
+            idle="Delete"
+            prompt="Delete this candidate?"
+            pending="Deleting…"
+            success={`${parsed?.candidate_name?.trim() || candidate.original_filename} was deleted.`}
+            onDelete={async () => {
+              setLeaving(true)
+              try {
+                await api.deleteCandidate(candidate.id)
+              } catch (error) {
+                setLeaving(false)
+                throw error
+              }
+              navigate(`/jobs/${jobId}`)
+            }}
+          />
+        </div>
       </header>
       {candidate.status === 'failed' ? (
         <div className="banner" role="alert">{candidate.error_message?.trim() || 'The pipeline stopped on this CV.'}</div>

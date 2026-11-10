@@ -1,6 +1,9 @@
 import { useRef, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
+import { api } from '../api'
+import { ConfirmDelete } from './ConfirmDelete'
 import { personLabel, PHASE_INDEX, PHASES, scoreText } from '../format'
+import { useLive } from '../live'
 import type { Ranking } from '../types'
 
 export function PipelineBoard({
@@ -12,6 +15,7 @@ export function PipelineBoard({
   rows: Ranking[]
   names: Record<string, string>
 }) {
+  const { refresh } = useLive()
   const ordered = useOrdered(rows)
   const steps = useRef(new Map<string, number>())
   if (ordered.length === 0) {
@@ -40,7 +44,23 @@ export function PipelineBoard({
                   </Link>
                   <span>{row.original_filename}</span>
                 </div>
-                <div className="pipe-score num">{scoreText(row.score?.overall_score)}</div>
+                <div className="pipe-side">
+                  <div className="pipe-score num">{scoreText(row.score?.overall_score)}</div>
+                  <ConfirmDelete
+                    idle="Delete"
+                    prompt="Delete this candidate?"
+                    pending="Deleting…"
+                    success={`${name} was deleted.`}
+                    onDelete={async () => {
+                      await api.deleteCandidate(row.id)
+                      try {
+                        await refresh()
+                      } catch {
+                        // The pipeline poll reloads the list.
+                      }
+                    }}
+                  />
+                </div>
               </div>
               <div className="stepper" style={motion}>
                 <span className={failed ? 'phase-marker bad' : 'phase-marker'}>{label}</span>

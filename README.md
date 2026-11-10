@@ -92,6 +92,7 @@ Two placeholders have to be replaced before applying. In `k8s/configmap.yaml`, s
 2. **Score.** Blind profile: skills, work history, education, and years of experience. Claude returns skills, experience, and education sub-scores plus evidence. `POST /score`. The stored overall is `skills_weight * skills + experience_weight * experience + education_weight * education`, with weights as percents, rounded half up to one decimal. The default is formula `v1`: 50, 35, and 15. Scoring ends at status `done`.
 3. **Formula.** `GET /api/formula` and `PUT /api/formula` with `skills_weight`, `experience_weight`, and `education_weight`. The three weights are from 0 to 100, at most two decimal places, and must add up to 100. A change rewrites every stored overall and formula label. It does not call the matcher. New uploads use only the new weights. `50/35/15` stays labeled `v1`; any other mix is labeled like `10/10/80`.
 4. **Override.** Accepted only after status `done`. It does not change the model score.
+5. **Delete.** `DELETE /api/candidates/{id}` removes that one candidate, plus the stored score and every recruiter decision. `DELETE /api/jobs/{id}` removes the role and every candidate under it, including their scores and decisions. Both return 204. A missing id returns 404.
 
 `POST /api/jobs/{id}/candidates` returns 202. Poll rankings until status is `done` or `failed`.
 
@@ -113,6 +114,12 @@ curl -s -X PUT http://localhost:8080/api/formula \
 curl -s -X POST http://localhost:8080/api/candidates/{candidateId}/override \
   -H 'content-type: application/json' \
   -d '{"decision":"accepted","note":"Matches the role","decided_by":"recruiter"}'
+
+curl -s -o /dev/null -w '%{http_code}\n' -X DELETE \
+  http://localhost:8080/api/candidates/{candidateId}
+
+curl -s -o /dev/null -w '%{http_code}\n' -X DELETE \
+  http://localhost:8080/api/jobs/{jobId}
 ```
 
 Request bodies for `/parse-resume` and `/score` are in the service docs linked above.

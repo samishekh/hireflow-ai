@@ -84,6 +84,13 @@ public class CandidateQueryService {
     }
 
     @Transactional
+    public void delete(UUID candidateId) {
+        CandidateEntity candidate = candidates.findById(candidateId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Candidate not found"));
+        candidates.delete(candidate);
+    }
+
+    @Transactional
     public OverrideResponse override(UUID candidateId, OverrideRequest request) {
         CandidateEntity candidate = candidates.findById(candidateId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Candidate not found"));

@@ -1,11 +1,13 @@
 import { Link, useParams } from 'react-router-dom'
+import { api } from '../api'
+import { ConfirmDelete } from '../components/ConfirmDelete'
 import { ScoreBars, SkillChips } from '../components/ScoreCard'
 import { decisionLabel, personLabel, scoreText, statusLabel } from '../format'
 import { useLive } from '../live'
 
 export function RankingsPage() {
   const { jobId } = useParams()
-  const { rows, names } = useLive()
+  const { rows, names, refresh } = useLive()
   if (!jobId) return null
   if (rows == null) return <div className="skeleton" role="status">Loading rankings…</div>
   if (rows.length === 0) {
@@ -19,7 +21,9 @@ export function RankingsPage() {
   }
   return (
     <ol className="rank-list">
-      {rows.map((row, index) => (
+      {rows.map((row, index) => {
+        const name = personLabel(row.original_filename, names[row.id])
+        return (
         <li key={row.id}>
           <article className="rank-card">
             <div className="score-hero">
@@ -30,11 +34,25 @@ export function RankingsPage() {
               <div className="rank-title">
                 <h2>
                   <Link to={`/jobs/${jobId}/candidates/${row.id}`}>
-                    {personLabel(row.original_filename, names[row.id])}
+                    {name}
                   </Link>
                 </h2>
                 <span className="muted">{row.original_filename}</span>
               </div>
+              <ConfirmDelete
+                idle="Delete"
+                prompt="Delete this candidate?"
+                pending="Deleting…"
+                success={`${name} was deleted.`}
+                onDelete={async () => {
+                  await api.deleteCandidate(row.id)
+                  try {
+                    await refresh()
+                  } catch {
+                    // The pipeline poll reloads the list.
+                  }
+                }}
+              />
               <p className="status-line">
                 <span className={row.status === 'failed' ? 'pill pill-bad' : 'pill'}>{statusLabel(row.status)}</span>
                 {row.override ? (
@@ -58,7 +76,8 @@ export function RankingsPage() {
             </div>
           </article>
         </li>
-      ))}
+        )
+      })}
     </ol>
   )
 }

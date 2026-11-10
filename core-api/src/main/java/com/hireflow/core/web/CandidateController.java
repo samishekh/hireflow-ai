@@ -4,6 +4,7 @@ import com.hireflow.core.service.CandidateQueryService;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,6 +24,12 @@ public class CandidateController {
     @GetMapping("/api/candidates/{id}")
     public CandidateResponse get(@PathVariable UUID id) {
         return candidates.get(id);
+    }
+
+    @DeleteMapping("/api/candidates/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable UUID id) {
+        candidates.delete(id);
     }
 
     @PostMapping("/api/candidates/{id}/override")

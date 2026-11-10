@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, ApiError } from '../api'
+import { ConfirmDelete } from '../components/ConfirmDelete'
 import { formatWhen } from '../format'
 import { excerpt } from '../jobText'
 import { useToast } from '../toast'
@@ -55,13 +56,25 @@ export function JobsPage() {
       {jobs && jobs.length > 0 ? (
         <ul className="job-grid">
           {jobs.map((job) => (
-            <li key={job.id}>
+            <li key={job.id} className="job-tile">
               <Link to={`/jobs/${job.id}`} className="job-card">
                 <span className="kicker">{formatWhen(job.created_at)}</span>
                 <h2>{job.title}</h2>
                 <p>{excerpt(job.description)}</p>
                 <span className="text-link">Open pipeline</span>
               </Link>
+              <div className="job-tile-actions">
+                <ConfirmDelete
+                  idle="Delete role"
+                  prompt="Delete this role and every candidate?"
+                  pending="Deleting…"
+                  success={`${job.title} was deleted.`}
+                  onDelete={async () => {
+                    await api.deleteJob(job.id)
+                    setJobs((current) => (current ? current.filter((item) => item.id !== job.id) : current))
+                  }}
+                />
+              </div>
             </li>
           ))}
         </ul>

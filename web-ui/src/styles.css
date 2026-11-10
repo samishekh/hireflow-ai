@@ -108,6 +108,33 @@ h3 {
 
 .btn-ink { background: var(--ink-on-yellow); color: var(--yellow); }
 
+.btn-small { padding: 8px 12px; font-size: 13px; }
+
+.btn-danger {
+  background: transparent;
+  color: #ffb4a4;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 90, 54, 0.75);
+}
+
+.btn-danger.armed { background: var(--danger); color: white; box-shadow: none; }
+
+.confirm-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.role-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
 button:focus-visible, a:focus-visible, [role="button"]:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
   outline: 2px solid var(--yellow);
   outline-offset: 3px;
@@ -154,6 +181,22 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible, input:focu
   padding: 0;
   list-style: none;
 }
+
+.job-tile {
+  display: grid;
+  align-content: space-between;
+  border-radius: 28px;
+  background: var(--card);
+  box-shadow: var(--shadow), inset 0 0 0 1px var(--line);
+}
+
+.job-tile .job-card {
+  background: transparent;
+  box-shadow: none;
+  min-height: 180px;
+}
+
+.job-tile-actions { padding: 0 20px 18px; }
 
 .job-card {
   display: grid;
@@ -343,6 +386,13 @@ textarea { min-height: 140px; resize: vertical; }
 .pipe-top > div:first-child { min-width: 0; }
 .pipe-top strong, .pipe-top span, .pipe-name { display: block; }
 .pipe-score { flex: none; }
+
+.pipe-side {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  flex: none;
+}
 .pipe-top span { color: var(--muted); font-size: 13px; }
 
 .pipe-score {

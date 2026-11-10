@@ -36,6 +36,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     throw new ApiError(await errorMessage(response), response.status)
   }
+  if (response.status === 204) return undefined as T
   return response.json() as Promise<T>
 }
 
@@ -53,6 +54,9 @@ export const api = {
       body: JSON.stringify({ title, description }),
     })
   },
+  deleteJob(id: string): Promise<void> {
+    return request<void>(`/api/jobs/${id}`, { method: 'DELETE' })
+  },
   rankings(jobId: string): Promise<Ranking[]> {
     return request<Ranking[]>(`/api/jobs/${jobId}/rankings`)
   },
@@ -66,6 +70,9 @@ export const api = {
   },
   candidate(id: string): Promise<Candidate> {
     return request<Candidate>(`/api/candidates/${id}`)
+  },
+  deleteCandidate(id: string): Promise<void> {
+    return request<void>(`/api/candidates/${id}`, { method: 'DELETE' })
   },
   formula(): Promise<Formula> {
     return request<Formula>('/api/formula')

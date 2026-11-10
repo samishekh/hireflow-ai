@@ -46,6 +46,11 @@ public class JobService {
         return JobResponse.from(require(jobId));
     }
 
+    @Transactional
+    public void delete(UUID jobId) {
+        jobs.delete(require(jobId));
+    }
+
     public JobEntity require(UUID jobId) {
         return jobs.findById(jobId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found"));
