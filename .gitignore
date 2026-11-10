@@ -7,5 +7,7 @@ dist/
 .idea/
 .vscode/
 smoke-test/
+/manual-test-pack/
+/package-lock.json
 __pycache__/
 *.pyc

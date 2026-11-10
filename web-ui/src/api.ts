@@ -1,4 +1,4 @@
-import type { Candidate, Job, Override, OverrideDecision, Ranking } from './types'
+import type { Candidate, Formula, Job, Override, OverrideDecision, Ranking } from './types'
 
 export class ApiError extends Error {
   status: number
@@ -66,6 +66,20 @@ export const api = {
   },
   candidate(id: string): Promise<Candidate> {
     return request<Candidate>(`/api/candidates/${id}`)
+  },
+  formula(): Promise<Formula> {
+    return request<Formula>('/api/formula')
+  },
+  updateFormula(skills: string, experience: string, education: string): Promise<Formula> {
+    return request<Formula>('/api/formula', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        skills_weight: skills,
+        experience_weight: experience,
+        education_weight: education,
+      }),
+    })
   },
   override(id: string, decision: OverrideDecision, note: string, decidedBy: string): Promise<Override> {
     return request<Override>(`/api/candidates/${id}/override`, {

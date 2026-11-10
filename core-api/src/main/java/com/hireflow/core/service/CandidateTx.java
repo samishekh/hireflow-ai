@@ -27,16 +27,19 @@ public class CandidateTx {
     private final JobRepository jobs;
     private final CandidateRepository candidates;
     private final MatchResultRepository matches;
+    private final ScoringFormulaService formulas;
     private final ObjectMapper objectMapper;
 
     public CandidateTx(
             JobRepository jobs,
             CandidateRepository candidates,
             MatchResultRepository matches,
+            ScoringFormulaService formulas,
             ObjectMapper objectMapper) {
         this.jobs = jobs;
         this.candidates = candidates;
         this.matches = matches;
+        this.formulas = formulas;
         this.objectMapper = objectMapper;
     }
 
@@ -120,16 +123,15 @@ public class CandidateTx {
         copy.setSkillsScore(source.getSkillsScore());
         copy.setExperienceScore(source.getExperienceScore());
         copy.setEducationScore(source.getEducationScore());
-        copy.setOverallScore(source.getOverallScore());
         copy.setMatchedSkills(ResumeChecks.copyList(source.getMatchedSkills()));
         copy.setMissingSkills(ResumeChecks.copyList(source.getMissingSkills()));
         copy.setStrengths(ResumeChecks.copyList(source.getStrengths()));
         copy.setConcerns(ResumeChecks.copyList(source.getConcerns()));
         copy.setSummary(source.getSummary());
-        copy.setFormulaVersion(source.getFormulaVersion());
         copy.setModel(source.getModel());
         copy.setCacheKey(cacheKey);
         copy.setCreatedAt(Instant.now());
+        formulas.apply(formulas.lock(), copy);
         matches.save(copy);
     }
 
@@ -140,16 +142,15 @@ public class CandidateTx {
         row.setSkillsScore(score.skillsScore());
         row.setExperienceScore(score.experienceScore());
         row.setEducationScore(score.educationScore());
-        row.setOverallScore(score.overallScore());
         row.setMatchedSkills(ResumeChecks.copyList(score.matchedSkills()));
         row.setMissingSkills(ResumeChecks.copyList(score.missingSkills()));
         row.setStrengths(ResumeChecks.copyList(score.strengths()));
         row.setConcerns(ResumeChecks.copyList(score.concerns()));
         row.setSummary(score.summary() == null ? "" : score.summary());
-        row.setFormulaVersion(score.formulaVersion());
         row.setModel(score.model());
         row.setCacheKey(cacheKey);
         row.setCreatedAt(Instant.now());
+        formulas.apply(formulas.lock(), row);
         matches.save(row);
     }
 

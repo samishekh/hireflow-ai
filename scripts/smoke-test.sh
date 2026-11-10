@@ -33,6 +33,11 @@ if [[ "$ready" -ne 1 ]]; then
   exit 1
 fi
 
+echo "Resetting scoring formula to v1"
+curl -fsS -X PUT "$BASE/api/formula" \
+  -H 'content-type: application/json' \
+  -d '{"skills_weight":50,"experience_weight":35,"education_weight":15}' >/dev/null
+
 job_json="$(curl -fsS -X POST "$BASE/api/jobs" \
   -H 'content-type: application/json' \
   -d '{"title":"Backend engineer","description":"Python APIs"}')"

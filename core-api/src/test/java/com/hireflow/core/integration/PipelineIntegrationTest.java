@@ -10,6 +10,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.hireflow.core.domain.CandidateStatus;
 import com.hireflow.core.domain.OverrideDecision;
 import com.hireflow.core.persistence.ScoreOverrideEntity;
+import com.hireflow.core.service.ScoreMath;
 import com.hireflow.core.web.CandidateResponse;
 import com.hireflow.core.web.OverrideResponse;
 import com.hireflow.core.web.RankingResponse;
@@ -34,7 +35,7 @@ class PipelineIntegrationTest extends PipelineTestSupport {
         assertThat(candidate.score().skillsScore()).isEqualTo(80.0);
         assertThat(candidate.score().experienceScore()).isEqualTo(70.0);
         assertThat(candidate.score().educationScore()).isEqualTo(60.0);
-        assertThat(candidate.score().overallScore()).isEqualTo(74.5);
+        assertThat(candidate.score().overallScore()).isEqualTo(v1(80, 70, 60));
         assertThat(candidate.score().formulaVersion()).isEqualTo("v1");
         assertThat(candidate.score().model()).isEqualTo("mock");
         assertThat(requestCount("/parse-resume")).isEqualTo(1);
@@ -64,7 +65,7 @@ class PipelineIntegrationTest extends PipelineTestSupport {
 
         List<RankingResponse> scored = rankings(jobId);
         assertThat(scored).extracting(RankingResponse::originalFilename).containsExactly("java.pdf", "python.pdf");
-        assertThat(scored).extracting(row -> row.score().overallScore()).containsExactly(90.0, 55.0);
+        assertThat(scored).extracting(row -> row.score().overallScore()).containsExactly(v1(92, 88, 80), v1(40, 50, 45));
         assertThat(scored).allSatisfy(row -> assertThat(row.status()).isEqualTo(CandidateStatus.done));
     }
 
@@ -150,5 +151,15 @@ class PipelineIntegrationTest extends PipelineTestSupport {
         assertThat(row.getNote()).isEqualTo("panel agrees");
         assertThat(row.getDecidedBy()).isEqualTo("sami");
         assertThat(getCandidate(candidateId).score().overallScore()).isEqualTo(overallBefore);
+    }
+
+    private static double v1(double skills, double experience, double education) {
+        return ScoreMath.overall(
+                ScoreMath.V1_SKILLS,
+                ScoreMath.V1_EXPERIENCE,
+                ScoreMath.V1_EDUCATION,
+                skills,
+                experience,
+                education);
     }
 }

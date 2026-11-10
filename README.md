@@ -9,7 +9,7 @@ A recruiter creates a job, uploads CV PDFs, and gets a ranked shortlist with rea
 | `resume-parser-service` | Python FastAPI. PDF to structured candidate data. Port 8000. | Built |
 | `job-matcher-service` | Python FastAPI. Scores a parsed CV against a job. Port 8001. | Built |
 | `core-api` | Java Spring Boot. Jobs, uploads, orchestration, PostgreSQL. Port 8080. | Built |
-| `web-ui` | React + Vite. Create a job, upload CVs, watch the pipeline, read rankings, record an override. Port 5173. | Built |
+| `web-ui` | React + Vite. Create a job, upload CVs, watch the pipeline, read rankings, edit the global formula, record an override. Port 5173. | Built |
 
 ## Run
 
@@ -62,7 +62,7 @@ With the stack up and both services in mock mode:
 ./scripts/smoke-test.sh
 ```
 
-The script creates a job, uploads `scripts/fixtures/one.pdf` and `scripts/fixtures/two.pdf`, and expects both candidates to finish at `overall_score` 67.0 with model `mock`. It then records an accepted override and checks that the decision is stored while the score stays the same. A real API key fails those fixed scores.
+The script sets the global formula back to v1, creates a job, uploads `scripts/fixtures/one.pdf` and `scripts/fixtures/two.pdf`, and expects both candidates to finish at `overall_score` 67.0 with model `mock`. It then records an accepted override and checks that the decision is stored while the score stays the same. A real API key fails those fixed scores.
 
 ## CI
 
@@ -86,11 +86,12 @@ Two placeholders have to be replaced before applying. In `k8s/configmap.yaml`, s
 
 ## Pipeline
 
-`core-api` runs each upload through parse and score. Name, email, and phone stay in PostgreSQL. The matcher receives the normalized job description and a blind profile only. `overall_score` and `formula_version` are stored as the matcher returns them. A second identical blind profile reuses the stored score.
+`core-api` runs each upload through parse and score. Name, email, and phone stay in PostgreSQL. The matcher receives the normalized job description and a blind profile only. Claude's sub-scores are stored as returned. `overall_score` is recomputed in `core-api` from the global formula, so the matcher's own overall is not stored. A second identical blind profile reuses the sub-scores and applies the current formula.
 
 1. **Parse.** Extract PDF text and return name, contact, skills, years of experience, work history, and education. PDF only, under 10MB. `POST /parse-resume`.
-2. **Score.** Blind profile: skills, work history, education, and years of experience. Claude returns skills, experience, and education sub-scores plus evidence. `overall_score` is `0.50 * skills + 0.35 * experience + 0.15 * education`, rounded to one decimal. Formula label: `v1`. `POST /score`. Scoring ends at status `done`.
-3. **Override.** Accepted only after status `done`. It does not change the model score.
+2. **Score.** Blind profile: skills, work history, education, and years of experience. Claude returns skills, experience, and education sub-scores plus evidence. `POST /score`. The stored overall is `skills_weight * skills + experience_weight * experience + education_weight * education`, with weights as percents, rounded half up to one decimal. The default is formula `v1`: 50, 35, and 15. Scoring ends at status `done`.
+3. **Formula.** `GET /api/formula` and `PUT /api/formula` with `skills_weight`, `experience_weight`, and `education_weight`. The three weights are from 0 to 100, at most two decimal places, and must add up to 100. A change rewrites every stored overall and formula label. It does not call the matcher. New uploads use only the new weights. `50/35/15` stays labeled `v1`; any other mix is labeled like `10/10/80`.
+4. **Override.** Accepted only after status `done`. It does not change the model score.
 
 `POST /api/jobs/{id}/candidates` returns 202. Poll rankings until status is `done` or `failed`.
 
@@ -104,6 +105,10 @@ curl -s -X POST http://localhost:8080/api/jobs/{jobId}/candidates \
   -F "files=@/path/to/two.pdf"
 
 curl -s http://localhost:8080/api/jobs/{jobId}/rankings
+
+curl -s -X PUT http://localhost:8080/api/formula \
+  -H 'content-type: application/json' \
+  -d '{"skills_weight":60,"experience_weight":25,"education_weight":15}'
 
 curl -s -X POST http://localhost:8080/api/candidates/{candidateId}/override \
   -H 'content-type: application/json' \

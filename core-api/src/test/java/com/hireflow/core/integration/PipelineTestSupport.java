@@ -21,7 +21,11 @@ import com.hireflow.core.domain.Education;
 import com.hireflow.core.domain.ParsedResume;
 import com.hireflow.core.domain.WorkExperience;
 import com.hireflow.core.persistence.ScoreOverrideRepository;
+import com.hireflow.core.persistence.ScoringFormulaEntity;
+import com.hireflow.core.persistence.ScoringFormulaRepository;
+import com.hireflow.core.service.ScoreMath;
 import com.hireflow.core.web.CandidateResponse;
+import com.hireflow.core.web.FormulaResponse;
 import com.hireflow.core.web.JobResponse;
 import com.hireflow.core.web.RankingResponse;
 import com.hireflow.core.web.ScoreBreakdown;
@@ -31,7 +35,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,6 +45,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -50,21 +54,16 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT)
-@Testcontainers
 abstract class PipelineTestSupport {
 
     private static final TypeReference<List<RankingResponse>> RANKINGS = new TypeReference<>() {
     };
 
-    @Container
     @ServiceConnection
-    static PostgreSQLContainer<?> postgres =
-            new PostgreSQLContainer<>(DockerImageName.parse("postgres:16-alpine"));
+    static final PostgreSQLContainer<?> postgres = startPostgres();
 
     static final WireMockServer WIRE_MOCK = startWireMock();
 
@@ -77,6 +76,9 @@ abstract class PipelineTestSupport {
     @Autowired
     ScoreOverrideRepository overrides;
 
+    @Autowired
+    ScoringFormulaRepository formulas;
+
     @DynamicPropertySource
     static void hireflowClients(DynamicPropertyRegistry registry) {
         registry.add("hireflow.parser-base-url", WIRE_MOCK::baseUrl);
@@ -88,16 +90,17 @@ abstract class PipelineTestSupport {
     void resetDownstream() {
         ParseGate.release();
         WIRE_MOCK.resetAll();
+        ScoringFormulaEntity formula = formulas.findById(ScoringFormulaEntity.ID).orElseThrow();
+        formula.setSkillsWeight(ScoreMath.V1_SKILLS);
+        formula.setExperienceWeight(ScoreMath.V1_EXPERIENCE);
+        formula.setEducationWeight(ScoreMath.V1_EDUCATION);
+        formula.setFormulaVersion(ScoreMath.V1);
+        formulas.saveAndFlush(formula);
     }
 
     @AfterEach
     void releaseParser() {
         ParseGate.release();
-    }
-
-    @AfterAll
-    static void stopWireMock() {
-        WIRE_MOCK.stop();
     }
 
     void stubParseAndScore(String skill, double skills, double experience, double education, double overall) {
@@ -170,6 +173,18 @@ abstract class PipelineTestSupport {
         ResponseEntity<String> response = rest.getForEntity("/api/candidates/{id}", String.class, candidateId);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         return read(response.getBody(), CandidateResponse.class);
+    }
+
+    FormulaResponse getFormula() {
+        ResponseEntity<String> response = rest.getForEntity("/api/formula", String.class);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        return read(response.getBody(), FormulaResponse.class);
+    }
+
+    ResponseEntity<String> putFormula(String body) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return rest.exchange("/api/formula", HttpMethod.PUT, new HttpEntity<>(body, headers), String.class);
     }
 
     List<RankingResponse> rankings(UUID jobId) {
@@ -249,12 +264,20 @@ abstract class PipelineTestSupport {
         return WIRE_MOCK.findAll(postRequestedFor(urlEqualTo(path))).size();
     }
 
+    private static PostgreSQLContainer<?> startPostgres() {
+        PostgreSQLContainer<?> container =
+                new PostgreSQLContainer<>(DockerImageName.parse("postgres:16-alpine"));
+        container.start();
+        return container;
+    }
+
     private static WireMockServer startWireMock() {
         WireMockServer server = new WireMockServer(wireMockConfig()
                 .dynamicPort()
                 .http2PlainDisabled(true)
                 .extensions(new HoldParseTransformer()));
         server.start();
+        Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
         return server;
     }
 

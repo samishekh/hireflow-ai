@@ -1,11 +1,14 @@
+import { useFormula } from '../formula'
 import { scoreText } from '../format'
-import type { Score } from '../types'
+import { weightText } from '../formulaWeights'
+import type { Formula, Score } from '../types'
 
 export function ScoreBars({ score }: { score: Score }) {
+  const formula = useFormula()
   const rows = [
-    ['Skills', score.skills_score, '50%'],
-    ['Experience', score.experience_score, '35%'],
-    ['Education', score.education_score, '15%'],
+    ['Skills', score.skills_score, formula ? weightText(formula.skills_weight) : '—'],
+    ['Experience', score.experience_score, formula ? weightText(formula.experience_weight) : '—'],
+    ['Education', score.education_score, formula ? weightText(formula.education_weight) : '—'],
   ] as const
   return (
     <div className="bars">
@@ -56,6 +59,7 @@ function ChipRow({ label, items, className }: { label: string; items: string[]; 
 }
 
 export function ScoreDetails({ score }: { score: Score }) {
+  const formula = useFormula()
   return (
     <div className="score-card">
       <div className="score-hero">
@@ -63,7 +67,7 @@ export function ScoreDetails({ score }: { score: Score }) {
         <small>Weighted score</small>
       </div>
       <ScoreBars score={score} />
-      <p className="formula">{formulaCopy(score.formula_version)}</p>
+      <p className="formula">{formulaCopy(score.formula_version, formula)}</p>
       {score.summary ? <p className="prose">{score.summary}</p> : null}
       <SkillChips score={score} />
       <Evidence title="Strengths" items={score.strengths ?? []} />
@@ -73,11 +77,11 @@ export function ScoreDetails({ score }: { score: Score }) {
   )
 }
 
-function formulaCopy(version: string): string {
-  if (version === 'v1') {
-    return 'Computed in code with formula v1: 50% skills, 35% experience, 15% education. A recruiter decision never overwrites this number.'
-  }
-  return `Computed in code with formula ${version}. A recruiter decision never overwrites this number.`
+function formulaCopy(version: string, formula: Formula | null): string {
+  const label = formula
+    ? `${formula.formula_version}: ${weightText(formula.skills_weight)} skills, ${weightText(formula.experience_weight)} experience, ${weightText(formula.education_weight)} education`
+    : version
+  return `Computed in code with formula ${label}. A recruiter decision never overwrites this number.`
 }
 
 function Evidence({ title, items }: { title: string; items: string[] }) {

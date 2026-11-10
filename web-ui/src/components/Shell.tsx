@@ -13,11 +13,16 @@ export function Shell() {
             <small>Recruiter desk</small>
           </span>
         </Link>
-        {atHome ? (
-          <Link to="/jobs/new" className="btn">New role</Link>
-        ) : (
-          <Link to="/" className="btn btn-ghost">All roles</Link>
-        )}
+        <div className="top-actions">
+          <NavLink to="/formula" className={({ isActive }) => (isActive ? 'btn' : 'btn btn-ghost')}>
+            Formula
+          </NavLink>
+          {atHome ? (
+            <Link to="/jobs/new" className="btn">New role</Link>
+          ) : (
+            <Link to="/" className="btn btn-ghost">All roles</Link>
+          )}
+        </div>
       </header>
       <main>
         <Outlet />

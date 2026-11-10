@@ -7,6 +7,15 @@ export type CandidateStatus =
 
 export type OverrideDecision = 'accepted' | 'overridden'
 
+export type Formula = {
+  skills_weight: number
+  experience_weight: number
+  education_weight: number
+  formula_version: string
+  updated_at: string
+  rescored_candidates: number
+}
+
 export type Score = {
   skills_score: number
   experience_score: number
