@@ -72,17 +72,35 @@ GitHub Actions runs on every pull request and on every push to `master`. Pytest 
 
 A push to `master` publishes the four images to GHCR as `ghcr.io/<owner>/hireflow-ai/<service>:latest` and a tag for the commit. The workflow uses `GITHUB_TOKEN`. No Claude key is stored in Actions.
 
-## Kubernetes
+## AWS
 
-Local runs stay on Compose. `k8s/` is the same app for Amazon EKS. The cluster is not created yet.
+Local runs stay on Compose. The same app ran on EKS in `us-east-1` from `hireflow-cluster.yaml` and the manifests in `k8s/`. That stack was deleted the same day. Nothing from it is still running.
 
-The manifests are a namespace, a ConfigMap, one Deployment and ClusterIP Service per app, and an Ingress in front of the UI. Probes match the Compose healthchecks. `web-ui` waits until `core-api` health reports UP. Postgres is not in the cluster. `core-api` reads `SPRING_DATASOURCE_URL` from the ConfigMap, and that value has to be the RDS endpoint. The parser and matcher stay on cluster DNS: `http://resume-parser-service:8000` and `http://job-matcher-service:8001`.
+The cluster is `hireflow`, Kubernetes 1.37, with the NAT gateway disabled and one managed node group, `ng-1`: a single public `t3.medium` and a 20 GB disk. The node's public IP is how image pulls and `api.anthropic.com` leave the VPC.
 
-Images are `ghcr.io/samishekh/hireflow-ai/<service>:latest` with `imagePullPolicy: Always`. Each Deployment expects a docker-registry Secret named `ghcr` in the `hireflow` namespace. `k8s/secret.example.yaml` shows the app Secret (`POSTGRES_PASSWORD`, `ANTHROPIC_API_KEY`, `CLAUDE_MODEL`) and is not applied by kustomize. An empty `ANTHROPIC_API_KEY` keeps both Python services in mock mode. An empty `CLAUDE_MODEL` leaves each service on `claude-sonnet-5-5`.
+Postgres is private RDS, PostgreSQL 16, class `db.t4g.micro`, single AZ, 20 GB. The database name is `hireflow` and the user is `postgres`. Public access is off, and port 5432 is open only from the node security group. Deletion protection is off and backup retention is 0, so the instance can be deleted without a final snapshot. `k8s/configmap.yaml` keeps `SPRING_DATASOURCE_URL` as `jdbc:postgresql://REPLACE_ME.rds.amazonaws.com:5432/hireflow`. The host is replaced with the RDS endpoint before apply, and that endpoint is not committed. The parser and matcher stay on cluster DNS: `http://resume-parser-service:8000` and `http://job-matcher-service:8001`.
 
-The Ingress class is `alb`, for the AWS Load Balancer Controller. It redirects HTTP to HTTPS, health-checks `/`, and sets the load balancer idle timeout to 180 seconds so a parse or score request is not cut off. The UI nginx already allows a 100 MB body and proxies `/api` and `/actuator` to `core-api`.
+Images are `ghcr.io/samishekh/hireflow-ai/<service>:latest` with `imagePullPolicy: Always`. Each Deployment expects a docker-registry Secret named `ghcr` in the `hireflow` namespace. `k8s/secret.example.yaml` is the shape of the app Secret (`POSTGRES_PASSWORD`, `ANTHROPIC_API_KEY`, `CLAUDE_MODEL`). It is created by hand and is not committed. This run set `CLAUDE_MODEL` to `claude-haiku-5-5`. An empty `ANTHROPIC_API_KEY` keeps both Python services in mock mode. An empty `CLAUDE_MODEL` leaves each service on `claude-sonnet-5-5`.
 
-Two placeholders have to be replaced before applying. In `k8s/configmap.yaml`, set `SPRING_DATASOURCE_URL` to the RDS endpoint. The database user there is `postgres`. In `k8s/ingress.yaml`, set `hireflow.example.com` and the ACM certificate ARN. The certificate has to be in the same region as the cluster.
+The AWS Load Balancer Controller, installed with IRSA, serves `k8s/ingress-http.yaml`. The load balancer is internet-facing, target type `ip`, HTTP on port 80 only, with health check `/` and an idle timeout of 180 seconds so a parse or score request is not cut off. There is no hostname and no certificate. The site is `http://<alb-dns-name>/`. The UI nginx proxies `/api` and `/actuator` to `core-api`.
+
+The manifests are applied directly: the namespace, the ConfigMap, one Deployment and ClusterIP Service per app, then the ingress. Probes match the Compose healthchecks. `web-ui` waits until `core-api` health reports UP.
+
+```bash
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/resume-parser-service.yaml
+kubectl apply -f k8s/job-matcher-service.yaml
+kubectl apply -f k8s/core-api.yaml
+kubectl apply -f k8s/web-ui.yaml
+kubectl apply -f k8s/ingress-http.yaml
+```
+
+Tear down in this order. Delete the ingress and wait until the load balancer is gone, delete the RDS instance with no final snapshot, then delete the cluster:
+
+```bash
+eksctl delete cluster --name hireflow --region us-east-1
+```
 
 ## Pipeline
 

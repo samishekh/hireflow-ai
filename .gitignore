@@ -9,5 +9,6 @@ dist/
 smoke-test/
 /manual-test-pack/
 /package-lock.json
+/iam_policy.json
 __pycache__/
 *.pyc
